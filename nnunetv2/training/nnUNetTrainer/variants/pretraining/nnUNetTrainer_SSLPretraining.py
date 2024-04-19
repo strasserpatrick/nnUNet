@@ -1,5 +1,7 @@
 import torch
+from torch import autocast
 
+from nnunetv2.utilities.helpers import dummy_context
 from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
 
 
@@ -16,13 +18,17 @@ class nnUNetTrainer_SSLPretraining(nnUNetTrainer):
     ):
         super().__init__(plans, configuration, fold, dataset_json, unpack_dataset, device)
 
-        if not "ssl_strategy" in kwargs:
-            raise ValueError("Please specify the SSL strategy when using the SSL pretraining trainer.")
-
         if not self.fold == "all":
             print("Warning: Using SSL pretraining with a single fold. This is not recommended.")
 
-        self.ssl_strategy = kwargs["ssl_strategy"]
-
-
-        # ssl strategy influences the loss function, optimizer and scheduler, get_training_transformes and train_step
+        
+    def forward(self, data, target):
+        # Autocast can be annoying
+        # If the device_type is 'cpu' then it's slow as heck and needs to be disabled.
+        # If the device_type is 'mps' then it will complain that mps is not implemented, even if enabled=False is set. Whyyyyyyy. (this is why we don't make use of enabled=False)
+        # So autocast will only be active if we have a cuda device.
+        with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
+            output = self.network(data) # we can access the self.network.encoder here instead, super nice
+            # del data
+            loss = self.loss(output, target)
+        return loss
