@@ -11,6 +11,7 @@ class nnUNetTrainerNoDeepSupervision(nnUNetTrainer):
         dataset_json: dict,
         unpack_dataset: bool = True,
         device: torch.device = torch.device("cuda"),
+        **kwargs
     ):
         super().__init__(plans, configuration, fold, dataset_json, unpack_dataset, device)
         self.enable_deep_supervision = False
