@@ -234,9 +234,6 @@ def run_training_entry():
                         help='Fold of the 5-fold cross-validation. Should be an int between 0 and 4.')
     parser.add_argument('-tr', type=str, required=False, default='nnUNetTrainer',
                         help='[OPTIONAL] Use this flag to specify a custom trainer. Default: nnUNetTrainer')
-    parser.add_argument("--ssl_strategy", type=str, default=None, required=False,
-                        help="[OPTIONAL] Use this to specify the self-supervised learning strategy to use. Only has "
-                             "an effect when nnUNetTrainer_SSLPretraining is used as trainer.")
     parser.add_argument('-p', type=str, required=False, default='nnUNetPlans',
                         help='[OPTIONAL] Use this flag to specify a custom plans identifier. Default: nnUNetPlans')
     parser.add_argument('-pretrained_weights', type=str, required=False, default=None,
@@ -267,7 +264,12 @@ def run_training_entry():
                         help="Use this to set the device the training should run with. Available options are 'cuda' "
                              "(GPU), 'cpu' (CPU) and 'mps' (Apple M1/M2). Do NOT use this to set which GPU ID! "
                              "Use CUDA_VISIBLE_DEVICES=X nnUNetv2_train [...] instead!")
-    args = parser.parse_args()
+
+    args, unknown = parser.parse_known_args()
+    kwargs = {}
+    for arg in unknown:
+        key, value = arg.split("=")
+        kwargs[key] = value
 
     assert args.device in ['cpu', 'cuda',
                            'mps'], f'-device must be either cpu, mps or cuda. Other devices are not tested/supported. Got: {args.device}.'
@@ -283,10 +285,6 @@ def run_training_entry():
         device = torch.device('cuda')
     else:
         device = torch.device('mps')
-
-    kwargs = {
-        'ssl_strategy': args.ssl_strategy
-    }
 
     run_training(dataset_name_or_id=args.dataset_name_or_id, configuration=args.configuration, fold=args.fold,
                  trainer_class_name=args.tr, plans_identifier=args.p,
