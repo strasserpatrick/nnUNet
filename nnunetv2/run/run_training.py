@@ -12,6 +12,7 @@ from nnunetv2.run.load_pretrained_weights import load_pretrained_weights
 from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
 from nnunetv2.utilities.dataset_name_id_conversion import maybe_convert_to_dataset_name
 from nnunetv2.utilities.find_class_by_name import recursive_find_python_class
+from nnunetv2.utilities.utils import parse_unknown_argsparse_kv
 from torch.backends import cudnn
 
 
@@ -266,10 +267,7 @@ def run_training_entry():
                              "Use CUDA_VISIBLE_DEVICES=X nnUNetv2_train [...] instead!")
 
     args, unknown = parser.parse_known_args()
-    kwargs = {}
-    for arg in unknown:
-        key, value = arg.split("=")
-        kwargs[key[2:]] = value
+    kwargs = parse_unknown_argsparse_kv(unknown)
 
     assert args.device in ['cpu', 'cuda',
                            'mps'], f'-device must be either cpu, mps or cuda. Other devices are not tested/supported. Got: {args.device}.'
