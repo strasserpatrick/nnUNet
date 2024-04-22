@@ -62,7 +62,7 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
     def forward(self, data, target):
 
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
-            features = self.network.encoder(data).flatten()
+            features = self.network.encoder(data).flatten(start_dim=1)
             
             # TODO: add the opportunity for a projection head, 
             # how can we determine outcome of encoder dynamically?
