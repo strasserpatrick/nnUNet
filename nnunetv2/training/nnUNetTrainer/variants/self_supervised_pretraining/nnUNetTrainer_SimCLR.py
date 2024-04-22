@@ -4,6 +4,7 @@ import torch
 from torch import autocast
 
 import torch.nn.functional as F
+import torch.nn
 
 from batchgenerators.transforms.utility_transforms import NumpyToTensor
 from batchgenerators.transforms.abstract_transforms import AbstractTransform, Compose
@@ -44,8 +45,7 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
 
         self.temperature = self.DEFAULT_TEMPERATURE_VALUE if "temperature" not in kwargs else kwargs['temperature']
         self.initial_learning_rate = self.INITIAL_LEARNING_RATE if "initial_learning_rate" not in kwargs else kwargs['initial_learning_rate']
-        self.weight_decay = self.WEIGHT_DECAY if "weight_decay" not in kwargs else kwargs["weight_decay"]
-        
+        self.weight_decay = self.WEIGHT_DECAY if "weight_decay" not in kwargs else kwargs["weight_decay"]     
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.network.parameters(),
@@ -62,10 +62,10 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
     def forward(self, data, target):
 
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
-
-            # TODO: how do I get this right that I do not confuse bs with augmentations in one dimension?
-
-            features = self.network.encoder(data)
+            features = self.network.encoder(data).flatten()
+            
+            # TODO: add the opportunity for a projection head, 
+            # how can we determine outcome of encoder dynamically?
 
             logits, labels = self.__info_nce_loss(features)
             loss = self.loss(logits, labels)
@@ -76,7 +76,7 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
 
         n_views = 2
 
-        labels = torch.cat([torch.arange(self.batch_size) for i in range(n_views)], dim=0)
+        labels = torch.cat([torch.arange(self.batch_size) for _ in range(n_views)], dim=0)
         labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
         labels = labels.to(self.device)
 

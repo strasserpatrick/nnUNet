@@ -18,6 +18,8 @@ class ContrastiveLearningViewGenerator(AbstractTransform):
             aug_view_dict = self.base_transforms(**data_dict)
             result_dict['data'].append(aug_view_dict['data'])
         
-        result_dict['data'] = torch.stack(result_dict['data'], dim=0) # batch, augmentations, modality, w, h, d
+        result_dict['data'] = torch.cat(result_dict['data'], dim=0) 
+        # batch + augmentations, modality, w, h, d
+        # loss will take care of this
 
         return result_dict
