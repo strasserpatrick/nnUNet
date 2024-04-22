@@ -4,6 +4,9 @@ import torch
 from torch import autocast
 
 import torch.nn.functional as F
+from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.contrastive_view_generator import ContrastiveLearningViewGenerator
+from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.gaussian_blur import GaussianBlur
+from torchvision import transforms
 
 from nnunetv2.utilities.helpers import dummy_context
 from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
@@ -15,10 +18,14 @@ from batchgenerators.transforms.abstract_transforms import AbstractTransform
 Resources:
 https://github.com/sthalles/SimCLR/
 https://medium.com/@prabowoyogawicaksana/self-supervised-pre-training-with-simclr-79830997be34
+
+TODO: 
+- what is size and s and how do we find this
+- where is the view generator from?
 """
 
 
-class nnUNetTrainer_SSLPretraining(nnUNetTrainer):
+class nnUNetTrainer_SimCLR(nnUNetTrainer):
     DEFAULT_TEMPERATURE_VALUE: float = 0.07
     INITIAL_LEARNING_RATE: float = 0.0003
     WEIGHT_DECAY: float = 1e-4
@@ -122,9 +129,24 @@ class nnUNetTrainer_SSLPretraining(nnUNetTrainer):
                                 regions: List[Union[List[int], Tuple[int, ...], int]] = None,
                                 ignore_label: int = None) -> AbstractTransform:
         
-        default_transform: AbstractTransform = nnUNetTrainer.get_validation_transforms(deep_supervision_scales, is_cascaded, foreground_labels,
+        transforms: AbstractTransform = nnUNetTrainer.get_validation_transforms(deep_supervision_scales, is_cascaded, foreground_labels,
                                                        regions, ignore_label)
+
+        transforms.transforms.append(nnUNetTrainer_SimCLR._getsimclr_transforms(size=patch_size))
+
+        return ContrastiveLearningViewGenerator(base_transform=transforms, n_views=2)
+
+    @staticmethod
+    def _getsimclr_transforms(size, s = 1):
+        color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
+
+        simclr_transforms: List = [transforms.RandomResizedCrop(size=size),
+                                              transforms.RandomHorizontalFlip(),
+                                              transforms.RandomApply([color_jitter], p=0.8),
+                                              transforms.RandomGrayscale(p=0.2),
+                                              GaussianBlur(kernel_size=int(0.1 * size)),
+                                              transforms.ToTensor()]
         
-    
-        print("hello")
+        return simclr_transforms
+
         

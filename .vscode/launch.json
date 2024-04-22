@@ -11,7 +11,7 @@
             "program": "${workspaceFolder}/nnunetv2/run/run_training.py",
             "console": "integratedTerminal",
             "envFile": "${workspaceFolder}/.env",
-            "args": ["137", "3d_fullres", "0", "-tr", "nnUNetTrainer_SSLPretraining", "--foo=bar"]
+            "args": ["137", "3d_fullres", "all", "-tr", "nnUNetTrainer_SimCLR", "--foo=bar"]
         }
     ]
 }
