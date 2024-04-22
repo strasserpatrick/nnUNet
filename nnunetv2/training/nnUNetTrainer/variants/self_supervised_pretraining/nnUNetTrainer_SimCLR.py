@@ -59,12 +59,12 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
         return torch.nn.CrossEntropyLoss().to(self.device)
 
         
-    def forward(self, data, _):
-
-        # TODO: How to integrate augmentation now here?
-        aug1, aug2 = data
+    def forward(self, data, target):
 
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
+
+            # TODO: how do I get this right that I do not confuse bs with augmentations in one dimension?
+
             features = self.network.encoder(data)
 
             logits, labels = self.__info_nce_loss(features)
