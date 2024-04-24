@@ -27,6 +27,7 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
     DEFAULT_TEMPERATURE_VALUE: float = 0.07
     INITIAL_LEARNING_RATE: float = 0.0003
     WEIGHT_DECAY: float = 1e-4
+    LATENT_SPACE_DIM: int = 8096
 
     def __init__(
             self,
@@ -45,7 +46,12 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
 
         self.temperature = self.DEFAULT_TEMPERATURE_VALUE if "temperature" not in kwargs else kwargs['temperature']
         self.initial_learning_rate = self.INITIAL_LEARNING_RATE if "initial_learning_rate" not in kwargs else kwargs['initial_learning_rate']
-        self.weight_decay = self.WEIGHT_DECAY if "weight_decay" not in kwargs else kwargs["weight_decay"]     
+        self.weight_decay = self.WEIGHT_DECAY if "weight_decay" not in kwargs else kwargs["weight_decay"]
+
+        self.use_projection_layer = False if "use_projection_layer" not in kwargs else kwargs["use_projection_layer"]
+        self.latent_space_dim = self.LATENT_SPACE_DIM if "latent_space_dim" not in kwargs else kwargs["latent_space_dim"]
+        self.projection_layer = None
+
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.network.parameters(),
@@ -62,10 +68,28 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
     def forward(self, data, target):
 
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
-            features = self.network.encoder(data).flatten(start_dim=1)
-            
-            # TODO: add the opportunity for a projection head, 
-            # how can we determine outcome of encoder dynamically?
+            # due to data augmentation, batch dimension has doubled in size
+            # to keep required gpu memory the same, forward pass is done in two passes.
+            data_aug_0, data_aug_1 = torch.chunk(data, 2)
+
+            features_0 = self.network.encoder.forward(data_aug_0)
+            features_1 = self.network.encoder.forward(data_aug_1)
+
+            # plain cnn encoder returns list of all feature maps
+            # we are only interesting in the final result
+            if isinstance(features_0, list): 
+                features_0 = features_0[-1]
+                features_1 = features_1[-1]
+
+            features = torch.cat((features_0, features_1)).flatten(start_dim=1)
+
+            if self.use_projection_layer:
+
+                # dynamic initialization depending on encoders output shape 
+                if not self.projection_layer:
+                    self.projection_layer = torch.nn.Linear(features.shape[1], self.latent_space_dim).to(self.device)
+
+                features = self.projection_layer(features)
 
             logits, labels = self.__info_nce_loss(features)
             loss = self.loss(logits, labels)
@@ -136,7 +160,5 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
 
 
         return ContrastiveLearningViewGenerator(base_transforms=Compose(ssl_transforms))
-    
-
 
         

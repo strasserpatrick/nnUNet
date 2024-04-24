@@ -68,7 +68,7 @@ def get_filenames_of_train_images_and_targets(raw_dataset_folder: str, dataset_j
 def parse_unknown_argsparse_kv(unknown: List[str]) -> dict[str, Any]:
     """
     parses a list of not-parsable argsparse options into key-value pairs for additional configuration
-    e.g. --foo=bar and --baz bla;
+    e.g. --foo=bar, --set_flag and --baz bla;
     """
     kwargs = {}
 
@@ -86,11 +86,14 @@ def parse_unknown_argsparse_kv(unknown: List[str]) -> dict[str, Any]:
             kwargs[key[2:]] = val
             i += 1
 
-        else:
+        elif i + 1 >= len(unknown) or (unknown[i+1].startswith("--")):
             # Case 2:
+            # --foo (set to true)
+            kwargs[arg[2:]] = True
+            i += 1
+        else:
+            # Case 3:
             # --foo bar
-            if i + 1 >= len(unknown) or (unknown[i+1].startswith("--")):
-                raise ValueError("unparsable extra flag ", arg)
 
             kwargs[arg[2:]] = unknown[i + 1]
             i += 2
