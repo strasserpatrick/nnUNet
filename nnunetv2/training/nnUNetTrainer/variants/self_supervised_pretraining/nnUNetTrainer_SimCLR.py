@@ -10,18 +10,19 @@ from batchgenerators.transforms.utility_transforms import NumpyToTensor
 from batchgenerators.transforms.abstract_transforms import AbstractTransform, Compose
 from batchgenerators.transforms.noise_transforms import GaussianNoiseTransform, GaussianBlurTransform
 
-from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.contrastive_view_generator import ContrastiveLearningViewGenerator
+from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.contrastive_view_generator import \
+    ContrastiveLearningViewGenerator
 from nnunetv2.utilities.helpers import dummy_context
 from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
 
 from batchgenerators.transforms.abstract_transforms import AbstractTransform
-
 
 """
 Resources:
 https://github.com/sthalles/SimCLR/
 https://medium.com/@prabowoyogawicaksana/self-supervised-pre-training-with-simclr-79830997be34
 """
+
 
 class nnUNetTrainer_SimCLR(nnUNetTrainer):
     DEFAULT_TEMPERATURE_VALUE: float = 0.07
@@ -45,26 +46,32 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
             print("Warning: Using SSL pretraining with a single fold. This is not recommended.")
 
         self.temperature = self.DEFAULT_TEMPERATURE_VALUE if "temperature" not in kwargs else kwargs['temperature']
-        self.initial_learning_rate = self.INITIAL_LEARNING_RATE if "initial_learning_rate" not in kwargs else kwargs['initial_learning_rate']
+        self.initial_learning_rate = self.INITIAL_LEARNING_RATE if "initial_learning_rate" not in kwargs else kwargs[
+            'initial_learning_rate']
         self.weight_decay = self.WEIGHT_DECAY if "weight_decay" not in kwargs else kwargs["weight_decay"]
 
         self.use_projection_layer = False if "use_projection_layer" not in kwargs else kwargs["use_projection_layer"]
-        self.latent_space_dim = self.LATENT_SPACE_DIM if "latent_space_dim" not in kwargs else kwargs["latent_space_dim"]
+        self.latent_space_dim = self.LATENT_SPACE_DIM if "latent_space_dim" not in kwargs else kwargs[
+            "latent_space_dim"]
         self.projection_layer = None
 
+    def initialize(self):
+        super().initialize()
+
+        # move encoder to cpu to save gpu memory
+        self.network.decoder.to('cpu')
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.network.parameters(),
-                          lr=self.initial_learning_rate,
-                          weight_decay=self.weight_decay,)
+                                     lr=self.initial_learning_rate,
+                                     weight_decay=self.weight_decay, )
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(self.dataloader_train), eta_min=0,
-                                                           last_epoch=-1)
+                                                               last_epoch=-1)
         return optimizer, scheduler
 
     def _build_loss(self):
         return torch.nn.CrossEntropyLoss().to(self.device)
 
-        
     def forward(self, data, target):
 
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
@@ -77,7 +84,7 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
 
             # plain cnn encoder returns list of all feature maps
             # we are only interesting in the final result
-            if isinstance(features_0, list): 
+            if isinstance(features_0, list):
                 features_0 = features_0[-1]
                 features_1 = features_1[-1]
 
@@ -94,7 +101,6 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
             logits, labels = self.__info_nce_loss(features)
             loss = self.loss(logits, labels)
         return loss
-    
 
     def __info_nce_loss(self, features):
 
@@ -128,7 +134,7 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
 
         logits = logits / self.temperature
         return logits, labels
-    
+
     # disabling nnUNet data augmentation and replacing by SimCLR 
     def configure_rotation_dummyDA_mirroring_and_inital_patch_size(self):
         # we need to disable mirroring here so that no mirroring will be applied in inferene!
@@ -152,13 +158,9 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
                                 foreground_labels: Union[Tuple[int, ...], List[int]] = None,
                                 regions: List[Union[List[int], Tuple[int, ...], int]] = None,
                                 ignore_label: int = None) -> AbstractTransform:
-        
+
         # TODO: concrete simCLR augmentation parameters here
         ssl_transforms = [(GaussianNoiseTransform())]
         ssl_transforms.append(NumpyToTensor(['data'], 'float'))
 
-
-
         return ContrastiveLearningViewGenerator(base_transforms=Compose(ssl_transforms))
-
-        
