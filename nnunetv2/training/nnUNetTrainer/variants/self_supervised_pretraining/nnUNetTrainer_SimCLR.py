@@ -25,10 +25,14 @@ https://medium.com/@prabowoyogawicaksana/self-supervised-pre-training-with-simcl
 
 
 class nnUNetTrainer_SimCLR(nnUNetTrainer):
-    DEFAULT_TEMPERATURE_VALUE: float = 0.07
-    INITIAL_LEARNING_RATE: float = 0.0003
-    WEIGHT_DECAY: float = 1e-4
-    LATENT_SPACE_DIM: int = 8096
+    DEFAULT_PARAMS: dict = {
+        "temperature": 0.07,
+        "initial_learning_rate": 0.0003,
+        "weight_decay": 1e-4,
+        "use_projection_layer": False,
+        "latent_space_dim": 8096,
+        "num_val_iterations_per_epoch": 0
+    }
 
     def __init__(
             self,
@@ -45,15 +49,16 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
         if not self.fold == "all":
             print("Warning: Using SSL pretraining with a single fold. This is not recommended.")
 
-        self.temperature = self.DEFAULT_TEMPERATURE_VALUE if "temperature" not in kwargs else kwargs['temperature']
-        self.initial_learning_rate = self.INITIAL_LEARNING_RATE if "initial_learning_rate" not in kwargs else kwargs[
-            'initial_learning_rate']
-        self.weight_decay = self.WEIGHT_DECAY if "weight_decay" not in kwargs else kwargs["weight_decay"]
+        self._set_hyperparameters(**kwargs)
 
-        self.use_projection_layer = False if "use_projection_layer" not in kwargs else kwargs["use_projection_layer"]
-        self.latent_space_dim = self.LATENT_SPACE_DIM if "latent_space_dim" not in kwargs else kwargs[
-            "latent_space_dim"]
-        self.projection_layer = None
+    def _set_hyperparameters(self, **kwargs):
+        for attribute_name in self.DEFAULT_PARAMS:
+            if attribute_name in kwargs:
+                # overwrite
+                setattr(self, attribute_name, kwargs[attribute_name])
+            else:
+                # default value
+                setattr(self, attribute_name, self.DEFAULT_PARAMS[attribute_name])
 
     def initialize(self):
         super().initialize()
