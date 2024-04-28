@@ -58,6 +58,7 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
     def initialize(self):
         super().initialize()
 
+        # TODO: fix this, currently both is moved, which leads to error
         # move encoder to cpu to save gpu memory
         self.network.decoder.to('cpu')
 
