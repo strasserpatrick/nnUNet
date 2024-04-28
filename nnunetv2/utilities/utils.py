@@ -14,7 +14,7 @@
 #    limitations under the License.
 import os.path
 from functools import lru_cache
-from typing import Union
+from typing import Any, Union
 
 from batchgenerators.utilities.file_and_folder_operations import *
 import numpy as np
@@ -63,6 +63,42 @@ def get_filenames_of_train_images_and_targets(raw_dataset_folder: str, dataset_j
         segs = [join(raw_dataset_folder, 'labelsTr', i + dataset_json['file_ending']) for i in identifiers]
         dataset = {i: {'images': im, 'label': se} for i, im, se in zip(identifiers, images, segs)}
     return dataset
+
+
+def parse_unknown_argsparse_kv(unknown: List[str]) -> dict[str, Any]:
+    """
+    parses a list of not-parsable argsparse options into key-value pairs for additional configuration
+    e.g. --foo=bar, --set_flag and --baz bla;
+    """
+    kwargs = {}
+
+    i = 0
+    while i < len(unknown):
+        arg = unknown[i]
+
+        if not arg.startswith("--"):
+            raise ValueError("unparsable extra flag ", arg)
+
+        if "=" in arg:
+            # Case 1:
+            # --foo=bar
+            key, val = arg.split("=")
+            kwargs[key[2:]] = val
+            i += 1
+
+        elif i + 1 >= len(unknown) or (unknown[i+1].startswith("--")):
+            # Case 2:
+            # --foo (set to true)
+            kwargs[arg[2:]] = True
+            i += 1
+        else:
+            # Case 3:
+            # --foo bar
+
+            kwargs[arg[2:]] = unknown[i + 1]
+            i += 2
+
+    return kwargs
 
 
 if __name__ == '__main__':
