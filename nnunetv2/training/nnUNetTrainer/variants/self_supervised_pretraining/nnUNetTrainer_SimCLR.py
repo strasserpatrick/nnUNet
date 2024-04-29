@@ -87,7 +87,7 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
             features_0 = self.network.encoder.forward(data_aug_0)
             features_1 = self.network.encoder.forward(data_aug_1)
 
-            # plain cnn encoder returns list of all feature maps
+            # plain cnn encoder returns list of all feature maps (len=6 for braTS)
             # we are only interesting in the final result
             if isinstance(features_0, list):
                 features_0 = features_0[-1]
