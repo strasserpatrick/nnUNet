@@ -35,7 +35,7 @@ def get_trainer_from_args(dataset_name_or_id: Union[int, str],
                           trainer_name: str = 'nnUNetTrainer',
                           plans_identifier: str = 'nnUNetPlans',
                           use_compressed: bool = False,
-                          device: torch.device = torch.device('cuda'), **kwargs):
+                          device: torch.device = torch.device('cuda'), **kwargs: object) -> object:
     # load nnunet class and do sanity checks
     nnunet_trainer = recursive_find_python_class(join(nnunetv2.__path__[0], "training", "nnUNetTrainer"),
                                                  trainer_name, 'nnunetv2.training.nnUNetTrainer')
@@ -116,7 +116,7 @@ def run_ddp(rank, dataset_name_or_id, configuration, fold, tr, p, use_compressed
     torch.cuda.set_device(torch.device('cuda', dist.get_rank()))
 
     nnunet_trainer = get_trainer_from_args(dataset_name_or_id, configuration, fold, tr, p,
-                                           use_compressed, kwargs=kwargs)
+                                           use_compressed, **kwargs)
 
     if disable_checkpointing:
         nnunet_trainer.disable_checkpointing = disable_checkpointing
