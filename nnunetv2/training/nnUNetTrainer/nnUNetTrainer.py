@@ -923,9 +923,6 @@ class nnUNetTrainer(object):
         data = data.to(self.device, non_blocking=True)
         if isinstance(target, list):
             target = [i.to(self.device, non_blocking=True) for i in target]
-        elif target is None:
-            # self supervised learning does not need target data
-            pass
         else:
             target = target.to(self.device, non_blocking=True)
 
