@@ -10,8 +10,6 @@ from batchgenerators.utilities.file_and_folder_operations import *
 from nnunetv2.dataset_conversion.generate_dataset_json import generate_dataset_json
 from nnunetv2.paths import nnUNet_raw
 
-from tqdm import tqdm
-
 file_dir = Path(__file__).parent
 
 
@@ -82,7 +80,7 @@ def preprocess_brats21(task_id=137, task_name="BraTS2021", excluded_case_ids=Non
 
     case_ids = [i for i in subdirs(brats_data_dir, prefix='BraTS', join=False) if i not in excluded_case_ids]
 
-    for c in tqdm(case_ids):
+    for c in case_ids:
         shutil.copy(join(brats_data_dir, c, c + "_t1.nii.gz"), join(imagestr, c + '_0000.nii.gz'))
         shutil.copy(join(brats_data_dir, c, c + "_t1ce.nii.gz"), join(imagestr, c + '_0001.nii.gz'))
         shutil.copy(join(brats_data_dir, c, c + "_t2.nii.gz"), join(imagestr, c + '_0002.nii.gz'))
