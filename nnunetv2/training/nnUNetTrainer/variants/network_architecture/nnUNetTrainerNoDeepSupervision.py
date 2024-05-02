@@ -4,13 +4,14 @@ import torch
 
 class nnUNetTrainerNoDeepSupervision(nnUNetTrainer):
     def __init__(
-        self,
-        plans: dict,
-        configuration: str,
-        fold: int,
-        dataset_json: dict,
-        unpack_dataset: bool = True,
-        device: torch.device = torch.device("cuda"),
+            self,
+            plans: dict,
+            configuration: str,
+            fold: int,
+            dataset_json: dict,
+            unpack_dataset: bool = True,
+            device: torch.device = torch.device("cuda"),
+            **kwargs
     ):
-        super().__init__(plans, configuration, fold, dataset_json, unpack_dataset, device)
+        super().__init__(plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs)
         self.enable_deep_supervision = False
