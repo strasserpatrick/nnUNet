@@ -1,12 +1,16 @@
 import multiprocessing
 import shutil
 from multiprocessing import Pool
+from pathlib import Path
 
 import SimpleITK as sitk
 import numpy as np
+import pandas as pd
 from batchgenerators.utilities.file_and_folder_operations import *
 from nnunetv2.dataset_conversion.generate_dataset_json import generate_dataset_json
 from nnunetv2.paths import nnUNet_raw
+
+file_dir = Path(__file__).parent
 
 
 def copy_BraTS_segmentation_and_convert_labels_to_nnUNet(in_file: str, out_file: str) -> None:
@@ -46,7 +50,8 @@ def load_convert_labels_back_to_BraTS(filename, input_folder, output_folder):
     sitk.WriteImage(d, join(output_folder, filename))
 
 
-def convert_folder_with_preds_back_to_BraTS_labeling_convention(input_folder: str, output_folder: str, num_processes: int = 12):
+def convert_folder_with_preds_back_to_BraTS_labeling_convention(input_folder: str, output_folder: str,
+                                                                num_processes: int = 12):
     """
     reads all prediction files (nifti) in the input folder, converts the labels back to BraTS convention and saves the
     """
@@ -56,11 +61,13 @@ def convert_folder_with_preds_back_to_BraTS_labeling_convention(input_folder: st
         p.starmap(load_convert_labels_back_to_BraTS, zip(nii, [input_folder] * len(nii), [output_folder] * len(nii)))
 
 
-if __name__ == '__main__':
-    brats_data_dir = '/home/isensee/drives/E132-Rohdaten/BraTS_2021/training'
+def preprocess_brats21(task_id=137, task_name="BraTS2021", excluded_case_ids=None):
+    if excluded_case_ids is None:
+        excluded_case_ids = []
+    else:
+        print(f"excluding {len(excluded_case_ids)} case ids from the dataset")
 
-    task_id = 137
-    task_name = "BraTS2021"
+    brats_data_dir = '/home/stud/strasser/archive/brats2021'
 
     foldername = "Dataset%03.0d_%s" % (task_id, task_name)
 
@@ -71,7 +78,7 @@ if __name__ == '__main__':
     maybe_mkdir_p(imagestr)
     maybe_mkdir_p(labelstr)
 
-    case_ids = subdirs(brats_data_dir, prefix='BraTS', join=False)
+    case_ids = [i for i in subdirs(brats_data_dir, prefix='BraTS', join=False) if i not in excluded_case_ids]
 
     for c in case_ids:
         shutil.copy(join(brats_data_dir, c, c + "_t1.nii.gz"), join(imagestr, c + '_0000.nii.gz'))
@@ -88,7 +95,7 @@ if __name__ == '__main__':
                               'background': 0,
                               'whole tumor': (1, 2, 3),
                               'tumor core': (2, 3),
-                              'enhancing tumor': (3, )
+                              'enhancing tumor': (3,)
                           },
                           num_training_cases=len(case_ids),
                           file_ending='.nii.gz',
@@ -96,3 +103,12 @@ if __name__ == '__main__':
                           license='see https://www.synapse.org/#!Synapse:syn25829067/wiki/610863',
                           reference='see https://www.synapse.org/#!Synapse:syn25829067/wiki/610863',
                           dataset_release='1.0')
+
+
+if __name__ == '__main__':
+    mapping_df = pd.read_csv(file_dir / 'BraTS2023_2017_GLI_Mapping.csv', sep=";")
+
+    excluded_case_ids = mapping_df[~mapping_df["BraTS2021"].isna() & ~mapping_df["BraTS2019"].isna()][
+        "BraTS2021"].tolist()
+
+    preprocess_brats21(task_id=300, task_name="BraTS2021_pretraining", excluded_case_ids=excluded_case_ids)
