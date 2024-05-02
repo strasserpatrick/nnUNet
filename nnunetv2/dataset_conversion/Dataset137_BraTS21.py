@@ -10,6 +10,8 @@ from batchgenerators.utilities.file_and_folder_operations import *
 from nnunetv2.dataset_conversion.generate_dataset_json import generate_dataset_json
 from nnunetv2.paths import nnUNet_raw
 
+from tqdm import tqdm
+
 file_dir = Path(__file__).parent
 
 
@@ -64,8 +66,10 @@ def convert_folder_with_preds_back_to_BraTS_labeling_convention(input_folder: st
 def preprocess_brats21(task_id=137, task_name="BraTS2021", excluded_case_ids=None):
     if excluded_case_ids is None:
         excluded_case_ids = []
+    else:
+        print(f"excluding {len(excluded_case_ids)} case ids from the dataset")
 
-    brats_data_dir = '/home/isensee/drives/E132-Rohdaten/BraTS_2021/training'
+    brats_data_dir = '/home/stud/strasser/archive/brats2021'
 
     foldername = "Dataset%03.0d_%s" % (task_id, task_name)
 
@@ -78,7 +82,7 @@ def preprocess_brats21(task_id=137, task_name="BraTS2021", excluded_case_ids=Non
 
     case_ids = [i for i in subdirs(brats_data_dir, prefix='BraTS', join=False) if i not in excluded_case_ids]
 
-    for c in case_ids:
+    for c in tqdm(case_ids):
         shutil.copy(join(brats_data_dir, c, c + "_t1.nii.gz"), join(imagestr, c + '_0000.nii.gz'))
         shutil.copy(join(brats_data_dir, c, c + "_t1ce.nii.gz"), join(imagestr, c + '_0001.nii.gz'))
         shutil.copy(join(brats_data_dir, c, c + "_t2.nii.gz"), join(imagestr, c + '_0002.nii.gz'))
@@ -107,6 +111,6 @@ if __name__ == '__main__':
     mapping_df = pd.read_csv(file_dir / 'BraTS2023_2017_GLI_Mapping.csv', sep=";")
 
     excluded_case_ids = mapping_df[~mapping_df["BraTS2021"].isna() & ~mapping_df["BraTS2019"].isna()][
-        "BraTS2019"].tolist()
+        "BraTS2021"].tolist()
 
     preprocess_brats21(task_id=300, task_name="BraTS2021_pretraining", excluded_case_ids=excluded_case_ids)
