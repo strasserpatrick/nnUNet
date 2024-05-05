@@ -9,9 +9,18 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/nnunetv2/run/run_training.py",
-            "console": "integratedTerminal",
+            "console": "internalConsole",
             "envFile": "${workspaceFolder}/.env",
-            "args": ["137", "3d_fullres", "all", "-tr", "nnUNetTrainer_SimCLR", "--foo=bar"]
+            "args": [
+                "300",
+                "3d_fullres",
+                "all",
+                "-tr",
+                "nnUNetTrainer_SimCLR",
+                "-p",
+                "nnUNetPreprocessPlans",
+                "--foo=bar"
+            ]
         }
     ]
 }
