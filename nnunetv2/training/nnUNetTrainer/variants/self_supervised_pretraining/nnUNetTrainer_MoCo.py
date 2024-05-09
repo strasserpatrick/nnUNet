@@ -5,6 +5,7 @@ from torch import autocast
 
 import torch.nn.functional as F
 import torch.nn
+from torch.optim.lr_scheduler import LambdaLR
 
 from batchgenerators.transforms.utility_transforms import NumpyToTensor
 from batchgenerators.transforms.abstract_transforms import AbstractTransform, Compose
@@ -35,6 +36,7 @@ resource: https://github.com/facebookresearch/moco
 class nnUNetTrainer_MoCo(nnUNetTrainer):
 
     DEFAULT_PARAMS: dict = {
+        "initial_lr": 0.03,  # TODO: momentum and learning rate scheduler in moco implementation?
         "temperature": 0.07,
         "num_val_iterations_per_epoch": 0,
         "queue_size": 65535,
@@ -115,7 +117,9 @@ class nnUNetTrainer_MoCo(nnUNetTrainer):
                 self.momentum_encoder_network.queue, dim=0
             )
 
-            self.momentum_encoder_network.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
+            self.momentum_encoder_network.register_buffer(
+                "queue_ptr", torch.zeros(1, dtype=torch.long)
+            )
 
             # compile network for free speedup
             if self._do_i_compile():
@@ -150,6 +154,23 @@ class nnUNetTrainer_MoCo(nnUNetTrainer):
                 "That should not happen."
             )
 
+    def _build_loss(self):
+        return torch.nn.CrossEntropyLoss().to(self.device)
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.SGD(
+            self.network.parameters(),
+            lr=self.initial_learning_rate,
+            weight_decay=self.weight_decay,
+        )
+
+        # this is a scheduler that does not schedule
+        # TODO: improve moco code
+        lambda_func = lambda epoch: 1.0
+        scheduler = LambdaLR(optimizer, lr_lambda=lambda_func)
+
+        return optimizer, scheduler
+
     def forward(self, data, target):
 
         with (
@@ -158,33 +179,219 @@ class nnUNetTrainer_MoCo(nnUNetTrainer):
             else dummy_context()
         ):
             # due to data augmentation, batch dimension has doubled in size
-            # to keep required gpu memory the same, forward pass is done in two passes.
-            data_aug_0, data_aug_1 = torch.chunk(data, 2)
+            # from that, we extract the key and query augmentations back
+            key_data, query_data = torch.chunk(data, 2)
+            q = self.query_forward(query_data)
+            k = self.key_forward(key_data)
 
-            features_0 = self.network.forward(data_aug_0)
-            features_1 = self.network.forward(data_aug_1)
+            # compute logits
+            # Einstein sum is more intuitive
+            # positive logits: Nx1
+            l_pos = torch.einsum("nc,nc->n", [q, k]).unsqueeze(-1)
+            # negative logits: NxK
+            l_neg = torch.einsum(
+                "nc,ck->nk", [q, self.momentum_encoder_network.clone().detach()]
+            )
 
-            # plain cnn encoder returns list of all feature maps (len=6 for braTS)
-            # we are only interesting in the final result
-            if isinstance(features_0, list):
-                features_0 = features_0[-1]
-                features_1 = features_1[-1]
+            # logits: Nx(1+K)
+            logits = torch.cat([l_pos, l_neg], dim=1)
 
-            features = torch.cat((features_0, features_1)).flatten(start_dim=1)
+            # apply temperature
+            logits /= self.temperature
 
-            if self.use_projection_layer:
+            # labels: positive key indicators
+            labels = torch.zeros(logits.shape[0], dtype=torch.long).to(self.device)
 
-                # dynamic initialization depending on encoders output shape
-                if not self.projection_layer:
-                    self.projection_layer = torch.nn.Linear(
-                        features.shape[1], self.latent_space_dim
-                    ).to(self.device)
+            # dequeue and enqueue
+            self._dequeue_and_enqueue(k)
 
-                features = self.projection_layer(features)
-
-            logits, labels = self.__info_nce_loss(features)
             loss = self.loss(logits, labels)
         return loss
 
+    @torch.no_grad
+    def key_forward(self, key_data):
+        self._momentum_update_key_encoder()
+
+        if self.ddp:
+            # TODO: this is not tested
+            key_data, idx_unshuffle = self._batch_shuffle_ddp(key_data)
+            k = self.momentum_encoder_network(key_data)
+
+            if isinstance(k, list):
+                k = k[-1].flatten(start_dim=1)
+
+            if self.use_projection_layer:
+                if not self.key_projection_layer:
+                    self.initialize_projection_layers(k.shape[1])
+                k = self.key_projection_layer(k)
+
+            k = F.normalize(k, dim=1)
+
+            # undo shuffle
+            k = self._batch_unshuffle_ddp(k, idx_unshuffle)
+        else:
+            k = self.momentum_encoder_network(key_data)
+
+            if isinstance(k, list):
+                k = k[-1].flatten(start_dim=1)
+
+            if self.use_projection_layer:
+                if not self.key_projection_layer:
+                    self.initialize_projection_layers(k.shape[1])
+                k = self.key_projection_layer(k)
+
+            k = F.normalize(k, dim=1)
+
+        return k
+
+    def query_forward(self, query_data):
+        q = self.network(query_data)
+
+        if isinstance(q, list):
+            q = q[-1].flatten(start_dim=1)
+
+        if self.use_procection_layer:
+            if not self.query_projection_layer:
+                self.initialize_projection_layers(q.shape[1])
+            q = self.query_projection_layer(q)
+
+        q = F.normalize(q, dim=1)
+        return q
+
+    def initialize_projection_layers(self, in_dimension):
+        if self.use_projection_layer:
+            if not self.query_projection_layer:
+                self.query_projection_layer = torch.nn.Linear(
+                    in_dimension, self.projection_layer_dimension
+                ).to(self.device)
+
+                self.key_projection_layer = torch.nn.Linear(
+                    in_dimension, self.projection_layer_dimension
+                ).to(self.device)
+
+    # disabling nnUNet data augmentation and replacing by SimCLR
+    def configure_rotation_dummyDA_mirroring_and_inital_patch_size(self):
+        # we need to disable mirroring here so that no mirroring will be applied in inferene!
+        rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes = (
+            super().configure_rotation_dummyDA_mirroring_and_inital_patch_size()
+        )
+        mirror_axes = None
+        self.inference_allowed_mirroring_axes = None
+        return rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes
+
+    @staticmethod
+    def get_training_transforms(
+        patch_size: Union[np.ndarray, Tuple[int]],
+        rotation_for_DA: dict,
+        deep_supervision_scales: Union[List, Tuple, None],
+        mirror_axes: Tuple[int, ...],
+        do_dummy_2d_data_aug: bool,
+        order_resampling_data: int = 1,
+        order_resampling_seg: int = 0,
+        border_val_seg: int = -1,
+        use_mask_for_norm: List[bool] = None,
+        is_cascaded: bool = False,
+        foreground_labels: Union[Tuple[int, ...], List[int]] = None,
+        regions: List[Union[List[int], Tuple[int, ...], int]] = None,
+        ignore_label: int = None,
+    ) -> AbstractTransform:
+
+        # TODO: concrete MoCo augmentation parameters here
+        ssl_transforms = [(GaussianNoiseTransform())]
+        ssl_transforms.append(NumpyToTensor(["data"], "float"))
+
+        return ContrastiveLearningViewGenerator(base_transforms=Compose(ssl_transforms))
+
     def set_deep_supervision_enabled(self, enabled: bool):
         pass
+
+    @torch.no_grad()
+    def _dequeue_and_enqueue(self, keys):
+        # gather keys before updating queue
+        keys = concat_all_gather(keys)
+
+        batch_size = keys.shape[0]
+
+        ptr = int(self.momentum_encoder_network.queue_ptr)
+        assert self.K % batch_size == 0  # for simplicity
+
+        # replace the keys at ptr (dequeue and enqueue)
+        self.queue[:, ptr : ptr + batch_size] = keys.T
+        ptr = (ptr + batch_size) % self.K  # move pointer
+
+        self.queue_ptr[0] = ptr
+
+    @torch.no_grad()
+    def _momentum_update_key_encoder(self):
+        """
+        Momentum update of the key encoder
+        """
+        for param_q, param_k in zip(
+            self.model.parameters(), self.momentum_encoder_network.parameters()
+        ):
+            param_k.data = (
+                param_k.data * self.encoder_updating_momentum
+                + param_q.data * (1.0 - self.encoder_updating_momentum)
+            )
+
+    @torch.no_grad()
+    def _batch_shuffle_ddp(self, x):
+        """
+        Batch shuffle, for making use of BatchNorm.
+        *** Only support DistributedDataParallel (DDP) model. ***
+        """
+        # gather from all gpus
+        batch_size_this = x.shape[0]
+        x_gather = concat_all_gather(x)
+        batch_size_all = x_gather.shape[0]
+
+        num_gpus = batch_size_all // batch_size_this
+
+        # random shuffle index
+        idx_shuffle = torch.randperm(batch_size_all).cuda()
+
+        # broadcast to all gpus
+        torch.distributed.broadcast(idx_shuffle, src=0)
+
+        # index for restoring
+        idx_unshuffle = torch.argsort(idx_shuffle)
+
+        # shuffled index for this gpu
+        gpu_idx = torch.distributed.get_rank()
+        idx_this = idx_shuffle.view(num_gpus, -1)[gpu_idx]
+
+        return x_gather[idx_this], idx_unshuffle
+
+    @torch.no_grad()
+    def _batch_unshuffle_ddp(self, x, idx_unshuffle):
+        """
+        Undo batch shuffle.
+        *** Only support DistributedDataParallel (DDP) model. ***
+        """
+        # gather from all gpus
+        batch_size_this = x.shape[0]
+        x_gather = concat_all_gather(x)
+        batch_size_all = x_gather.shape[0]
+
+        num_gpus = batch_size_all // batch_size_this
+
+        # restored index for this gpu
+        gpu_idx = torch.distributed.get_rank()
+        idx_this = idx_unshuffle.view(num_gpus, -1)[gpu_idx]
+
+        return x_gather[idx_this]
+
+
+@torch.no_grad()
+def concat_all_gather(tensor):
+    """
+    Performs all_gather operation on the provided tensors.
+    *** Warning ***: torch.distributed.all_gather has no gradient.
+    """
+    tensors_gather = [
+        torch.ones_like(tensor) for _ in range(torch.distributed.get_world_size())
+    ]
+    torch.distributed.all_gather(tensors_gather, tensor, async_op=False)
+
+    output = torch.cat(tensors_gather, dim=0)
+    return output
