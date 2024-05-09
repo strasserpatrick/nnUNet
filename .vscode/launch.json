@@ -16,7 +16,7 @@
                 "3d_fullres",
                 "all",
                 "-tr",
-                "nnUNetTrainer_SimCLR",
+                "nnUNetTrainer_MoCo",
                 "-p",
                 "nnUNetPreprocessPlans",
                 "--foo=bar"
