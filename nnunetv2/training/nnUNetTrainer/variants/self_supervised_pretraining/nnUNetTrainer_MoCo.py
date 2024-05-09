@@ -334,6 +334,17 @@ class nnUNetTrainer_MoCo(nnUNetTrainer):
                 + param_q.data * (1.0 - self.encoder_updating_momentum)
             )
 
+        # we also want to update the weights of the projection layer
+        if self.use_projection_layer:
+            for param_q, param_k in zip(
+                self.query_projection_layer.parameters(),
+                self.key_projection_layer.parameters,
+            ):
+                param_k.data = (
+                    param_k.data * self.encoder_updating_momentum
+                    + param_q.data * (1.0 - self.encoder_updating_momentum)
+                )
+
     @torch.no_grad()
     def _batch_shuffle_ddp(self, x):
         """
