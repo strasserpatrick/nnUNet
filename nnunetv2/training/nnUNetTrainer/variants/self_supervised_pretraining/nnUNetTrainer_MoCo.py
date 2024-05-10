@@ -53,15 +53,11 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
         **kwargs,
     ):
         super().__init__(
-            plans, configuration, fold, dataset_json, unpack_dataset, device
+            plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
         )
 
-        if not self.fold == "all":
-            print(
-                "Warning: Using SSL pretraining with a single fold. This is not recommended."
-            )
-
-        self._set_hyperparameters(**kwargs)
+        self.query_projection_layer = None
+        self.key_projection_layer = None
 
     def initialize(self):
         if not self.was_initialized:
@@ -148,7 +144,7 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
     def configure_optimizers(self):
         optimizer = torch.optim.SGD(
             self.network.parameters(),
-            lr=self.initial_learning_rate,
+            lr=self.initial_lr,
             weight_decay=self.weight_decay,
         )
 
@@ -178,7 +174,7 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
             l_pos = torch.einsum("nc,nc->n", [q, k]).unsqueeze(-1)
             # negative logits: NxK
             l_neg = torch.einsum(
-                "nc,ck->nk", [q, self.momentum_encoder_network.clone().detach()]
+                "nc,ck->nk", [q, self.momentum_encoder_network.queue.clone().detach()]
             )
 
             # logits: Nx(1+K)
@@ -200,13 +196,14 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
     def key_forward(self, key_data):
         self._momentum_update_key_encoder()
 
-        if self.ddp:
+        if self.is_ddp:
             # TODO: this is not tested
             key_data, idx_unshuffle = self._batch_shuffle_ddp(key_data)
             k = self.momentum_encoder_network(key_data)
 
             if isinstance(k, list):
-                k = k[-1].flatten(start_dim=1)
+                k = k[-1]
+            k = k.flatten(start_dim=1)
 
             if self.use_projection_layer:
                 if not self.key_projection_layer:
@@ -221,7 +218,8 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
             k = self.momentum_encoder_network(key_data)
 
             if isinstance(k, list):
-                k = k[-1].flatten(start_dim=1)
+                k = k[-1]
+            k = k.flatten(start_dim=1)
 
             if self.use_projection_layer:
                 if not self.key_projection_layer:
@@ -236,9 +234,10 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
         q = self.network(query_data)
 
         if isinstance(q, list):
-            q = q[-1].flatten(start_dim=1)
+            q = q[-1]
+        q = q.flatten(start_dim=1)
 
-        if self.use_procection_layer:
+        if self.use_projection_layer:
             if not self.query_projection_layer:
                 self.initialize_projection_layers(q.shape[1])
             q = self.query_projection_layer(q)
@@ -305,7 +304,7 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
         Momentum update of the key encoder
         """
         for param_q, param_k in zip(
-            self.model.parameters(), self.momentum_encoder_network.parameters()
+            self.network.parameters(), self.momentum_encoder_network.parameters()
         ):
             param_k.data = (
                 param_k.data * self.encoder_updating_momentum
@@ -316,7 +315,7 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
         if self.use_projection_layer:
             for param_q, param_k in zip(
                 self.query_projection_layer.parameters(),
-                self.key_projection_layer.parameters,
+                self.key_projection_layer.parameters(),
             ):
                 param_k.data = (
                     param_k.data * self.encoder_updating_momentum
