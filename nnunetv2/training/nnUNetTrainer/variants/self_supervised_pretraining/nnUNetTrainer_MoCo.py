@@ -294,13 +294,13 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
         batch_size = keys.shape[0]
 
         ptr = int(self.momentum_encoder_network.queue_ptr)
-        assert self.K % batch_size == 0  # for simplicity
+        assert self.queue_size % batch_size == 0  # for simplicity
 
         # replace the keys at ptr (dequeue and enqueue)
-        self.queue[:, ptr : ptr + batch_size] = keys.T
-        ptr = (ptr + batch_size) % self.K  # move pointer
+        self.momentum_encoder_network.queue[:, ptr : ptr + batch_size] = keys.T
+        ptr = (ptr + batch_size) % self.queue_size  # move pointer
 
-        self.queue_ptr[0] = ptr
+        self.momentum_encoder_network.queue_ptr[0] = ptr
 
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
