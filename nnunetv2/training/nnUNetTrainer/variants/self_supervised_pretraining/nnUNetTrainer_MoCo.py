@@ -5,9 +5,7 @@ import torch
 import torch.nn
 import torch.nn.functional as F
 from batchgenerators.transforms.abstract_transforms import AbstractTransform, Compose
-from batchgenerators.transforms.noise_transforms import (
-    GaussianNoiseTransform,
-)
+from batchgenerators.transforms.noise_transforms import GaussianNoiseTransform
 from batchgenerators.transforms.utility_transforms import NumpyToTensor
 from torch import autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -174,7 +172,13 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
             l_pos = torch.einsum("nc,nc->n", [q, k]).unsqueeze(-1)
             # negative logits: NxK
             l_neg = torch.einsum(
-                "nc,ck->nk", [q, self.momentum_encoder_network.queue.clone().detach().to(self.device)]
+                "nc,ck->nk",
+                [
+                    q,
+                    self.momentum_encoder_network.queue.clone()
+                    .detach()
+                    .to(self.device),
+                ],
             )
 
             # logits: Nx(1+K)
@@ -285,7 +289,7 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
     @torch.no_grad()
     def _dequeue_and_enqueue(self, keys):
         # gather keys before updating queue
-        keys = concat_all_gather(keys)
+        keys = self.concat_all_gather(keys)
 
         batch_size = keys.shape[0]
 
@@ -330,7 +334,7 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
         """
         # gather from all gpus
         batch_size_this = x.shape[0]
-        x_gather = concat_all_gather(x)
+        x_gather = self.concat_all_gather(x)
         batch_size_all = x_gather.shape[0]
 
         num_gpus = batch_size_all // batch_size_this
@@ -358,7 +362,7 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
         """
         # gather from all gpus
         batch_size_this = x.shape[0]
-        x_gather = concat_all_gather(x)
+        x_gather = self.concat_all_gather(x)
         batch_size_all = x_gather.shape[0]
 
         num_gpus = batch_size_all // batch_size_this
@@ -369,17 +373,19 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
 
         return x_gather[idx_this]
 
+    @torch.no_grad()
+    def concat_all_gather(self, tensor):
+        """
+        Performs all_gather operation on the provided tensors.
+        *** Warning ***: torch.distributed.all_gather has no gradient.
+        """
+        if not self.is_ddp:
+            return tensor.clone()
 
-@torch.no_grad()
-def concat_all_gather(tensor):
-    """
-    Performs all_gather operation on the provided tensors.
-    *** Warning ***: torch.distributed.all_gather has no gradient.
-    """
-    tensors_gather = [
-        torch.ones_like(tensor) for _ in range(torch.distributed.get_world_size())
-    ]
-    torch.distributed.all_gather(tensors_gather, tensor, async_op=False)
+        tensors_gather = [
+            torch.ones_like(tensor) for _ in range(torch.distributed.get_world_size())
+        ]
+        torch.distributed.all_gather(tensors_gather, tensor, async_op=False)
 
-    output = torch.cat(tensors_gather, dim=0)
-    return output
+        output = torch.cat(tensors_gather, dim=0)
+        return output
