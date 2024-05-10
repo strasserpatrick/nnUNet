@@ -35,7 +35,7 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
         "weight_decay": 1e-4,
         "use_projection_layer": False,
         "latent_space_dim": 8096,
-        "num_val_iterations_per_epoch": 0,
+        "num_val_iterations_per_epoch": 1,
     }
 
     def __init__(
@@ -102,17 +102,18 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
                 features_0 = features_0[-1]
                 features_1 = features_1[-1]
 
-            features = torch.cat((features_0, features_1)).flatten(start_dim=1)
-
             if self.use_projection_layer:
 
                 # dynamic initialization depending on encoders output shape
                 if not self.projection_layer:
                     self.projection_layer = torch.nn.Linear(
-                        features.shape[1], self.latent_space_dim
+                        features_1.shape[1], self.latent_space_dim
                     ).to(self.device)
 
-                features = self.projection_layer(features)
+                features_0 = self.projection_layer(features_0)
+                features_1 = self.projection_layer(features_1)
+
+            features = torch.cat((features_0, features_1)).flatten(start_dim=1)
 
             logits, labels = self.__info_nce_loss(features)
             loss = self.loss(logits, labels)
