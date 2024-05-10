@@ -1,18 +1,17 @@
 from typing import List, Tuple, Union
+
 import numpy as np
 import torch
+import torch.nn
+import torch.nn.functional as F
+from batchgenerators.transforms.abstract_transforms import AbstractTransform, Compose
+from batchgenerators.transforms.noise_transforms import GaussianNoiseTransform
+from batchgenerators.transforms.utility_transforms import NumpyToTensor
 from torch import autocast
 
-import torch.nn.functional as F
-import torch.nn
-
-from batchgenerators.transforms.utility_transforms import NumpyToTensor
-from batchgenerators.transforms.abstract_transforms import AbstractTransform, Compose
-from batchgenerators.transforms.noise_transforms import (
-    GaussianNoiseTransform,
-    GaussianBlurTransform,
+from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.ssl_base_trainer import (
+    nnUNetBaseTrainer,
 )
-
 from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.contrastive_view_generator import (
     ContrastiveLearningViewGenerator,
 )
@@ -20,9 +19,6 @@ from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper
     info_nce_loss,
 )
 from nnunetv2.utilities.helpers import dummy_context
-from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
-
-from batchgenerators.transforms.abstract_transforms import AbstractTransform
 
 """
 Resources:
@@ -31,7 +27,7 @@ https://medium.com/@prabowoyogawicaksana/self-supervised-pre-training-with-simcl
 """
 
 
-class nnUNetTrainer_SimCLR(nnUNetTrainer):
+class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
     DEFAULT_PARAMS: dict = {
         "temperature": 0.07,
         "initial_learning_rate": 0.0003,
@@ -61,15 +57,6 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
             )
 
         self._set_hyperparameters(**kwargs)
-
-    def _set_hyperparameters(self, **kwargs):
-        for attribute_name in self.DEFAULT_PARAMS:
-            if attribute_name in kwargs:
-                # overwrite
-                setattr(self, attribute_name, kwargs[attribute_name])
-            else:
-                # default value
-                setattr(self, attribute_name, self.DEFAULT_PARAMS[attribute_name])
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
@@ -105,17 +92,18 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
                 features_0 = features_0[-1]
                 features_1 = features_1[-1]
 
-            features = torch.cat((features_0, features_1)).flatten(start_dim=1)
-
             if self.use_projection_layer:
 
                 # dynamic initialization depending on encoders output shape
                 if not self.projection_layer:
                     self.projection_layer = torch.nn.Linear(
-                        features.shape[1], self.latent_space_dim
+                        features_1.shape[1], self.latent_space_dim
                     ).to(self.device)
 
-                features = self.projection_layer(features)
+                features_0 = self.projection_layer(features_0)
+                features_1 = self.projection_layer(features_1)
+
+            features = torch.cat((features_0, features_1)).flatten(start_dim=1)
 
             logits, labels = info_nce_loss(
                 features=features,
@@ -126,15 +114,44 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
             loss = self.loss(logits, labels)
         return loss
 
-    # disabling nnUNet data augmentation and replacing by SimCLR
-    def configure_rotation_dummyDA_mirroring_and_inital_patch_size(self):
-        # we need to disable mirroring here so that no mirroring will be applied in inferene!
-        rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes = (
-            super().configure_rotation_dummyDA_mirroring_and_inital_patch_size()
+    def __info_nce_loss(self, features):
+
+        n_views = 2
+
+        labels = torch.cat(
+            [torch.arange(self.batch_size) for _ in range(n_views)], dim=0
         )
-        mirror_axes = None
-        self.inference_allowed_mirroring_axes = None
-        return rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes
+        labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
+        labels = labels.to(self.device)
+
+        features = F.normalize(features, dim=1)
+
+        similarity_matrix = torch.matmul(features, features.T)
+        # assert similarity_matrix.shape == (
+        #     self.args.n_views * self.args.batch_size, self.args.n_views * self.args.batch_size)
+        # assert similarity_matrix.shape == labels.shape
+
+        # discard the main diagonal from both: labels and similarities matrix
+        mask = torch.eye(labels.shape[0], dtype=torch.bool).to(self.device)
+        labels = labels[~mask].view(labels.shape[0], -1)
+        similarity_matrix = similarity_matrix[~mask].view(
+            similarity_matrix.shape[0], -1
+        )
+        # assert similarity_matrix.shape == labels.shape
+
+        # select and combine multiple positives
+        positives = similarity_matrix[labels.bool()].view(labels.shape[0], -1)
+
+        # select only the negatives the negatives
+        negatives = similarity_matrix[~labels.bool()].view(
+            similarity_matrix.shape[0], -1
+        )
+
+        logits = torch.cat([positives, negatives], dim=1)
+        labels = torch.zeros(logits.shape[0], dtype=torch.long).to(self.device)
+
+        logits = logits / self.temperature
+        return logits, labels
 
     @staticmethod
     def get_training_transforms(
@@ -158,8 +175,3 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
         ssl_transforms.append(NumpyToTensor(["data"], "float"))
 
         return ContrastiveLearningViewGenerator(base_transforms=Compose(ssl_transforms))
-
-    def set_deep_supervision_enabled(self, enabled: bool):
-        # we have deep supervision disabled, but as we do not have a decoder here,
-        # we have to overwrite this method
-        pass
