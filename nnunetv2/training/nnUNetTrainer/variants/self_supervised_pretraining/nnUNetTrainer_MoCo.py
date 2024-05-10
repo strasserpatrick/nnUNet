@@ -196,7 +196,7 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
             loss = self.loss(logits, labels)
         return loss
 
-    @torch.no_grad
+    @torch.no_grad()
     def key_forward(self, key_data):
         self._momentum_update_key_encoder()
 
