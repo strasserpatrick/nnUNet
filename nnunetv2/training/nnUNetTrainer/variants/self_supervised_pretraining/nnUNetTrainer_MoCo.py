@@ -174,7 +174,7 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
             l_pos = torch.einsum("nc,nc->n", [q, k]).unsqueeze(-1)
             # negative logits: NxK
             l_neg = torch.einsum(
-                "nc,ck->nk", [q, self.momentum_encoder_network.queue.clone().detach()]
+                "nc,ck->nk", [q, self.momentum_encoder_network.queue.clone().detach().to(self.device)]
             )
 
             # logits: Nx(1+K)
