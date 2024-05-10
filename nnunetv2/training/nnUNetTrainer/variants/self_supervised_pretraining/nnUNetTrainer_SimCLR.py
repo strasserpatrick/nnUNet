@@ -1,3 +1,4 @@
+from time import time
 from typing import List, Tuple, Union
 import numpy as np
 import torch
@@ -12,6 +13,7 @@ from batchgenerators.transforms.noise_transforms import (
     GaussianNoiseTransform,
     GaussianBlurTransform,
 )
+from batchgenerators.utilities.file_and_folder_operations import join
 
 from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.contrastive_view_generator import (
     ContrastiveLearningViewGenerator,
@@ -35,7 +37,7 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
         "weight_decay": 1e-4,
         "use_projection_layer": False,
         "latent_space_dim": 8096,
-        "num_val_iterations_per_epoch": 1,
+        "num_val_iterations_per_epoch": 0,
     }
 
     def __init__(
@@ -195,3 +197,23 @@ class nnUNetTrainer_SimCLR(nnUNetTrainer):
         # we have deep supervision disabled, but as we do not have a decoder here,
         # we have to overwrite this method
         pass
+
+    def on_validation_epoch_end(self, val_outputs: List[dict]):
+        pass
+
+    def on_epoch_end(self):
+        self.logger.log('epoch_end_timestamps', time(), self.current_epoch)
+
+        self.print_to_log_file('train_loss', np.round(self.logger.my_fantastic_logging['train_losses'][-1], decimals=4))
+        self.print_to_log_file(
+            f"Epoch time: {np.round(self.logger.my_fantastic_logging['epoch_end_timestamps'][-1] - self.logger.my_fantastic_logging['epoch_start_timestamps'][-1], decimals=2)} s")
+
+        # handling periodic checkpointing
+        current_epoch = self.current_epoch
+        if (current_epoch + 1) % self.save_every == 0 and current_epoch != (self.num_epochs - 1):
+            self.save_checkpoint(join(self.output_folder, 'checkpoint_latest.pth'))
+
+        if self.local_rank == 0:
+            self.logger.plot_progress_png(self.output_folder)
+
+        self.current_epoch += 1
