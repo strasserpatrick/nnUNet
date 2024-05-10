@@ -260,6 +260,16 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
                     in_dimension, self.projection_layer_dimension
                 ).to(self.device)
 
+                for param_q, param_k in tqdm(
+                zip(
+                    self.query_projection_layer.parameters(),
+                    self.key_projection_layer.parameters(),
+                )
+                ):
+                    param_k.data.copy_(param_q.data)  # initialize
+                    param_k.requires_grad = False  # not update by gradient
+
+
     @staticmethod
     def get_training_transforms(
         patch_size: Union[np.ndarray, Tuple[int]],

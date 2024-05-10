@@ -31,7 +31,7 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
         "temperature": 0.07,
         "initial_learning_rate": 0.0003,
         "weight_decay": 1e-4,
-        "use_projection_layer": False,
+        "use_projection_layer": True,
         "latent_space_dim": 8096,
         "num_val_iterations_per_epoch": 0,
     }
@@ -49,6 +49,8 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
         super().__init__(
             plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
         )
+
+        self.projection_layer = None
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
@@ -84,6 +86,9 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
                 features_0 = features_0[-1]
                 features_1 = features_1[-1]
 
+            features_0 = features_0.flatten(start_dim=1)
+            features_1 = features_1.flatten(start_dim=1)
+
             if self.use_projection_layer:
 
                 # dynamic initialization depending on encoders output shape
@@ -92,8 +97,8 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
                         features_1.shape[1], self.latent_space_dim
                     ).to(self.device)
 
-                features_0 = self.projection_layer(features_0.flatten(start_dim=1))
-                features_1 = self.projection_layer(features_1.flatten(start_dim=1))
+                features_0 = self.projection_layer(features_0)
+                features_1 = self.projection_layer(features_1)
 
             features = torch.cat((features_0, features_1))
 
