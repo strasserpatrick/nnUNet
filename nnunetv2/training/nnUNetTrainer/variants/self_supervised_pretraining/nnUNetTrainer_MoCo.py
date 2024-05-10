@@ -1,39 +1,36 @@
 from typing import List, Tuple, Union
+
 import numpy as np
 import torch
-from torch import autocast
-
-import torch.nn.functional as F
 import torch.nn
-from torch.optim.lr_scheduler import LambdaLR
-
-from batchgenerators.transforms.utility_transforms import NumpyToTensor
+import torch.nn.functional as F
 from batchgenerators.transforms.abstract_transforms import AbstractTransform, Compose
 from batchgenerators.transforms.noise_transforms import (
     GaussianNoiseTransform,
-    GaussianBlurTransform,
 )
+from batchgenerators.transforms.utility_transforms import NumpyToTensor
+from torch import autocast
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.optim.lr_scheduler import LambdaLR
 from tqdm import tqdm
 
 from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.contrastive_view_generator import (
     ContrastiveLearningViewGenerator,
 )
+from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.ssl_base_trainer import (
+    nnUNetBaseTrainer,
+)
 from nnunetv2.utilities.helpers import dummy_context
-from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
-
-from batchgenerators.transforms.abstract_transforms import AbstractTransform
-
 from nnunetv2.utilities.label_handling.label_handling import (
     determine_num_input_channels,
 )
-from torch.nn.parallel import DistributedDataParallel as DDP
 
 """
 resource: https://github.com/facebookresearch/moco
 """
 
 
-class nnUNetTrainer_MoCo(nnUNetTrainer):
+class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
 
     DEFAULT_PARAMS: dict = {
         "initial_lr": 0.03,  # TODO: momentum and learning rate scheduler in moco implementation?
@@ -65,15 +62,6 @@ class nnUNetTrainer_MoCo(nnUNetTrainer):
             )
 
         self._set_hyperparameters(**kwargs)
-
-    def _set_hyperparameters(self, **kwargs):
-        for attribute_name in self.DEFAULT_PARAMS:
-            if attribute_name in kwargs:
-                # overwrite
-                setattr(self, attribute_name, kwargs[attribute_name])
-            else:
-                # default value
-                setattr(self, attribute_name, self.DEFAULT_PARAMS[attribute_name])
 
     def initialize(self):
         if not self.was_initialized:
@@ -268,16 +256,6 @@ class nnUNetTrainer_MoCo(nnUNetTrainer):
                 self.key_projection_layer = torch.nn.Linear(
                     in_dimension, self.projection_layer_dimension
                 ).to(self.device)
-
-    # disabling nnUNet data augmentation and replacing by SimCLR
-    def configure_rotation_dummyDA_mirroring_and_inital_patch_size(self):
-        # we need to disable mirroring here so that no mirroring will be applied in inferene!
-        rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes = (
-            super().configure_rotation_dummyDA_mirroring_and_inital_patch_size()
-        )
-        mirror_axes = None
-        self.inference_allowed_mirroring_axes = None
-        return rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes
 
     @staticmethod
     def get_training_transforms(
