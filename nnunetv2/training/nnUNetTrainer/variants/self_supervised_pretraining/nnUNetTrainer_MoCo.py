@@ -81,7 +81,7 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
                 self.enable_deep_supervision,
             ).to(self.device)
 
-            self.print_to_log_file("Cloning weights of encoder to momentum decoder")
+            self.print_to_log_file("Cloning weights of encoder to momentum encoder")
             for param_q, param_k in tqdm(
                 zip(
                     self.network.parameters(),
