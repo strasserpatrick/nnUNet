@@ -116,7 +116,7 @@ def run_ddp(rank, dataset_name_or_id, configuration, fold, tr, p, use_compressed
     torch.cuda.set_device(torch.device('cuda', dist.get_rank()))
 
     nnunet_trainer = get_trainer_from_args(dataset_name_or_id, configuration, fold, tr, p,
-                                           use_compressed, kwargs=kwargs)
+                                           use_compressed, **kwargs)
 
     if disable_checkpointing:
         nnunet_trainer.disable_checkpointing = disable_checkpointing
