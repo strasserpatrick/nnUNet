@@ -4,8 +4,13 @@ import numpy as np
 import torch
 import torch.nn
 from batchgenerators.transforms.abstract_transforms import AbstractTransform, Compose
-from batchgenerators.transforms.noise_transforms import GaussianNoiseTransform
+from batchgenerators.transforms.noise_transforms import (
+    GaussianNoiseTransform,
+    GaussianBlurTransform,
+)
+from batchgenerators.transforms.crop_and_pad_transforms import RandomCropTransform
 from batchgenerators.transforms.utility_transforms import NumpyToTensor
+from batchgenerators.transforms.spatial_transforms import MirrorTransform
 from torch import autocast
 
 from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.ssl_base_trainer import (
@@ -129,7 +134,12 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
     ) -> AbstractTransform:
 
         # TODO: concrete simCLR augmentation parameters here
-        ssl_transforms = [(GaussianNoiseTransform())]
+        ssl_transforms = [
+            RandomCropTransform(),
+            GaussianNoiseTransform(p_per_sample=0.8, p_per_channel=0.8),
+            GaussianBlurTransform(p_per_sample=0.8, p_per_channel=0.8),
+            MirrorTransform(p_per_sample=0.3)
+        ]
         ssl_transforms.append(NumpyToTensor(["data"], "float"))
 
         return ContrastiveLearningViewGenerator(base_transforms=Compose(ssl_transforms))

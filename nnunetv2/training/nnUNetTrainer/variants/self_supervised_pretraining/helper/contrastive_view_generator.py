@@ -5,7 +5,6 @@ from batchgenerators.transforms.abstract_transforms import AbstractTransform, Co
 
 
 class ContrastiveLearningViewGenerator(AbstractTransform):
-    """Take two random crops of one image as the query and key."""
 
     def __init__(self, base_transforms: Compose, n_views=2):
         self.base_transforms = base_transforms
@@ -18,6 +17,7 @@ class ContrastiveLearningViewGenerator(AbstractTransform):
             aug_view_dict = self.base_transforms(**data_dict)
             result_dict['data'].append(aug_view_dict['data'])
         
+        assert not torch.equal(*result_dict['data'])
         result_dict['data'] = torch.cat(result_dict['data'], dim=0) 
         # batch + augmentations, modality, w, h, d
         # loss will take care of this
