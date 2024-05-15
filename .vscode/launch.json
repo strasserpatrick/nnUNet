@@ -10,13 +10,14 @@
             "request": "launch",
             "program": "${workspaceFolder}/nnunetv2/run/run_training.py",
             "console": "internalConsole",
+            "justMyCode": false,
             "envFile": "${workspaceFolder}/.env",
             "args": [
                 "300",
                 "3d_fullres",
                 "all",
                 "-tr",
-                "nnUNetTrainer_MoCo",
+                "nnUNetTrainer_SimCLR",
                 "-p",
                 "nnUNetPreprocessPlans",
                 "--foo=bar"
