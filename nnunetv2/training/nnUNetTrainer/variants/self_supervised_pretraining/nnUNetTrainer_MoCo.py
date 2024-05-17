@@ -5,8 +5,13 @@ import torch
 import torch.nn
 import torch.nn.functional as F
 from batchgenerators.transforms.abstract_transforms import AbstractTransform, Compose
-from batchgenerators.transforms.noise_transforms import GaussianNoiseTransform
+from batchgenerators.transforms.noise_transforms import (
+    GaussianNoiseTransform,
+    GaussianBlurTransform,
+)
+from batchgenerators.transforms.crop_and_pad_transforms import RandomCropTransform
 from batchgenerators.transforms.utility_transforms import NumpyToTensor
+from batchgenerators.transforms.spatial_transforms import MirrorTransform
 from torch import autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim.lr_scheduler import LambdaLR
@@ -261,14 +266,13 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
                 ).to(self.device)
 
                 for param_q, param_k in tqdm(
-                zip(
-                    self.query_projection_layer.parameters(),
-                    self.key_projection_layer.parameters(),
-                )
+                    zip(
+                        self.query_projection_layer.parameters(),
+                        self.key_projection_layer.parameters(),
+                    )
                 ):
                     param_k.data.copy_(param_q.data)  # initialize
                     param_k.requires_grad = False  # not update by gradient
-
 
     @staticmethod
     def get_training_transforms(
@@ -287,9 +291,13 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
         ignore_label: int = None,
     ) -> AbstractTransform:
 
-        # TODO: concrete MoCo augmentation parameters here
-        ssl_transforms = [(GaussianNoiseTransform())]
-        ssl_transforms.append(NumpyToTensor(["data"], "float"))
+        ssl_transforms = [
+            RandomCropTransform(),
+            GaussianNoiseTransform(p_per_sample=0.8, p_per_channel=0.8),
+            GaussianBlurTransform(p_per_sample=0.8, p_per_channel=0.8),
+            MirrorTransform(p_per_sample=0.3),
+            NumpyToTensor(["data"], "float"),
+        ]
 
         return ContrastiveLearningViewGenerator(base_transforms=Compose(ssl_transforms))
 

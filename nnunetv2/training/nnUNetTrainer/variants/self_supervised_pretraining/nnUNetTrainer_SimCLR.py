@@ -83,7 +83,9 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
             data_aug_0, data_aug_1 = torch.chunk(data, 2)
 
             features_0 = self.network.forward(data_aug_0)
-            features_1 = self.network.forward(data_aug_1)
+
+            with torch.no_grad():
+                features_1 = self.network.forward(data_aug_1)
 
             # plain cnn encoder returns list of all feature maps (len=6 for braTS)
             # we are only interesting in the final result
@@ -98,8 +100,11 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
 
                 # dynamic initialization depending on encoders output shape
                 if not self.projection_layer:
-                    self.projection_layer = torch.nn.Linear(
-                        features_1.shape[1], self.latent_space_dim
+                    self.projection_layer = torch.nn.Sequential(
+                        torch.nn.Linear(features_1.shape[1], self.latent_space_dim),
+                        torch.nn.ReLU(),
+                        torch.nn.Linear(self.latent_space_dim, self.latent_space_dim),
+                        torch.nn.ReLU(),
                     ).to(self.device)
 
                 features_0 = self.projection_layer(features_0)
@@ -133,9 +138,12 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
         ignore_label: int = None,
     ) -> AbstractTransform:
 
-        # TODO: concrete simCLR augmentation parameters here
-        ssl_transforms = [RandomCropTransform(), GaussianNoiseTransform(p_per_sample=0.8, p_per_channel=0.8),
-                          GaussianBlurTransform(p_per_sample=0.8, p_per_channel=0.8), MirrorTransform(p_per_sample=0.3),
-                          NumpyToTensor(["data"], "float")]
+        ssl_transforms = [
+            RandomCropTransform(),
+            GaussianNoiseTransform(p_per_sample=0.8, p_per_channel=0.8),
+            GaussianBlurTransform(p_per_sample=0.8, p_per_channel=0.8),
+            MirrorTransform(p_per_sample=0.3),
+            NumpyToTensor(["data"], "float"),
+        ]
 
         return ContrastiveLearningViewGenerator(base_transforms=Compose(ssl_transforms))
