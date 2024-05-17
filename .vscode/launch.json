@@ -5,6 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python-Debugger: Aktuelle Datei",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "internalConsole"
+        },
+        {
             "name": "Python-Debugger run_training",
             "type": "debugpy",
             "request": "launch",
