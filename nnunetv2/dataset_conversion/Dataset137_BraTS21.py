@@ -68,7 +68,7 @@ def preprocess_brats21(task_id=137, task_name="BraTS2021", excluded_case_ids=Non
     else:
         print(f"excluding {len(excluded_case_ids)} case ids from the dataset")
 
-    brats_data_dir = '/home/stud/strasser/archive/brats2021'
+    brats_data_dir = '/Users/patricks/Downloads/brats2021/BraTS2021_Training_Data'
 
     foldername = "Dataset%03.0d_%s" % (task_id, task_name)
 

@@ -134,12 +134,8 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
     ) -> AbstractTransform:
 
         # TODO: concrete simCLR augmentation parameters here
-        ssl_transforms = [
-            RandomCropTransform(),
-            GaussianNoiseTransform(p_per_sample=0.8, p_per_channel=0.8),
-            GaussianBlurTransform(p_per_sample=0.8, p_per_channel=0.8),
-            MirrorTransform(p_per_sample=0.3)
-        ]
-        ssl_transforms.append(NumpyToTensor(["data"], "float"))
+        ssl_transforms = [RandomCropTransform(), GaussianNoiseTransform(p_per_sample=0.8, p_per_channel=0.8),
+                          GaussianBlurTransform(p_per_sample=0.8, p_per_channel=0.8), MirrorTransform(p_per_sample=0.3),
+                          NumpyToTensor(["data"], "float")]
 
         return ContrastiveLearningViewGenerator(base_transforms=Compose(ssl_transforms))
