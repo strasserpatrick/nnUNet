@@ -1,3 +1,4 @@
+import math
 from typing import List, Tuple, Union
 
 import numpy as np
@@ -34,31 +35,37 @@ resource: https://github.com/facebookresearch/moco
 
 
 class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
-
     DEFAULT_PARAMS: dict = {
-        "initial_lr": 0.03,  # TODO: momentum and learning rate scheduler in moco implementation?
+        "initial_lr": 0.03,
+        "learning_rate_schedule": [120, 160],
+        "optimizer_momentum": 0.9,
+        "weight_decay": 1e-4,
+        "use_cosine_schedule": False,
         "temperature": 0.07,
-        "num_val_iterations_per_epoch": 0,
         "queue_size": 65535,
         "encoder_updating_momentum": 0.999,
-        "use_projection_layer": True,
         "projection_layer_dimension": 128,
+        "num_val_iterations_per_epoch": 0,
     }
 
     def __init__(
-        self,
-        plans: dict,
-        configuration: str,
-        fold: int,
-        dataset_json: dict,
-        unpack_dataset: bool = True,
-        device: torch.device = torch.device("cuda"),
-        **kwargs,
+            self,
+            plans: dict,
+            configuration: str,
+            fold: int,
+            dataset_json: dict,
+            unpack_dataset: bool = True,
+            device: torch.device = torch.device("cuda"),
+            **kwargs,
     ):
         super().__init__(
             plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
         )
 
+        self.use_cosine_schedule = None
+        self.learning_rate_schedule = None
+        self.encoder_updating_momentum = None
+        self.optimizer_momentum = None
         self.query_projection_layer = None
         self.key_projection_layer = None
 
@@ -88,10 +95,10 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
 
             self.print_to_log_file("Cloning weights of encoder to momentum encoder")
             for param_q, param_k in tqdm(
-                zip(
-                    self.network.parameters(),
-                    self.momentum_encoder_network.parameters(),
-                )
+                    zip(
+                        self.network.parameters(),
+                        self.momentum_encoder_network.parameters(),
+                    )
             ):
                 param_k.data.copy_(param_q.data)  # initialize
                 param_k.requires_grad = False  # not update by gradient
@@ -149,12 +156,24 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
             self.network.parameters(),
             lr=self.initial_lr,
             weight_decay=self.weight_decay,
+            momentum=self.optimizer_momentum
         )
 
-        # this is a scheduler that does not schedule
-        # TODO: improve moco code
-        lambda_func = lambda epoch: 1.0
-        scheduler = LambdaLR(optimizer, lr_lambda=lambda_func)
+        def lr_lambda(epoch):
+            lr = self.initial_lr
+            if self.use_cosine_schedule:
+                # Cosine learning rate schedule
+                lr *= 0.5 * (1.0 + math.cos(math.pi * epoch / self.epochs))
+            else:
+                # Stepwise learning rate schedule
+                for milestone in self.learning_rate_schedule:
+                    if epoch >= milestone:
+                        lr *= 0.1
+                    else:
+                        break
+            return lr / self.initial_lr
+
+        scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
 
         return optimizer, scheduler
 
@@ -214,10 +233,9 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
                 k = k[-1]
             k = k.flatten(start_dim=1)
 
-            if self.use_projection_layer:
-                if not self.key_projection_layer:
-                    self.initialize_projection_layers(k.shape[1])
-                k = self.key_projection_layer(k)
+            if not self.key_projection_layer:
+                self.initialize_projection_layers(k.shape[1])
+            k = self.key_projection_layer(k)
 
             k = F.normalize(k, dim=1)
 
@@ -230,10 +248,9 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
                 k = k[-1]
             k = k.flatten(start_dim=1)
 
-            if self.use_projection_layer:
-                if not self.key_projection_layer:
-                    self.initialize_projection_layers(k.shape[1])
-                k = self.key_projection_layer(k)
+            if not self.key_projection_layer:
+                self.initialize_projection_layers(k.shape[1])
+            k = self.key_projection_layer(k)
 
             k = F.normalize(k, dim=1)
 
@@ -246,49 +263,47 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
             q = q[-1]
         q = q.flatten(start_dim=1)
 
-        if self.use_projection_layer:
-            if not self.query_projection_layer:
-                self.initialize_projection_layers(q.shape[1])
-            q = self.query_projection_layer(q)
+        if not self.query_projection_layer:
+            self.initialize_projection_layers(q.shape[1])
+        q = self.query_projection_layer(q)
 
         q = F.normalize(q, dim=1)
         return q
 
     def initialize_projection_layers(self, in_dimension):
-        if self.use_projection_layer:
-            if not self.query_projection_layer:
-                self.query_projection_layer = torch.nn.Linear(
-                    in_dimension, self.projection_layer_dimension
-                ).to(self.device)
+        if not self.query_projection_layer:
+            self.query_projection_layer = torch.nn.Linear(
+                in_dimension, self.projection_layer_dimension
+            ).to(self.device)
 
-                self.key_projection_layer = torch.nn.Linear(
-                    in_dimension, self.projection_layer_dimension
-                ).to(self.device)
+        self.key_projection_layer = torch.nn.Linear(
+            in_dimension, self.projection_layer_dimension
+        ).to(self.device)
 
-                for param_q, param_k in tqdm(
-                    zip(
-                        self.query_projection_layer.parameters(),
-                        self.key_projection_layer.parameters(),
-                    )
-                ):
-                    param_k.data.copy_(param_q.data)  # initialize
-                    param_k.requires_grad = False  # not update by gradient
+        for param_q, param_k in tqdm(
+                zip(
+                    self.query_projection_layer.parameters(),
+                    self.key_projection_layer.parameters(),
+                )
+        ):
+            param_k.data.copy_(param_q.data)  # initialize
+            param_k.requires_grad = False  # not update by gradient
 
     @staticmethod
     def get_training_transforms(
-        patch_size: Union[np.ndarray, Tuple[int]],
-        rotation_for_DA: dict,
-        deep_supervision_scales: Union[List, Tuple, None],
-        mirror_axes: Tuple[int, ...],
-        do_dummy_2d_data_aug: bool,
-        order_resampling_data: int = 1,
-        order_resampling_seg: int = 0,
-        border_val_seg: int = -1,
-        use_mask_for_norm: List[bool] = None,
-        is_cascaded: bool = False,
-        foreground_labels: Union[Tuple[int, ...], List[int]] = None,
-        regions: List[Union[List[int], Tuple[int, ...], int]] = None,
-        ignore_label: int = None,
+            patch_size: Union[np.ndarray, Tuple[int]],
+            rotation_for_DA: dict,
+            deep_supervision_scales: Union[List, Tuple, None],
+            mirror_axes: Tuple[int, ...],
+            do_dummy_2d_data_aug: bool,
+            order_resampling_data: int = 1,
+            order_resampling_seg: int = 0,
+            border_val_seg: int = -1,
+            use_mask_for_norm: List[bool] = None,
+            is_cascaded: bool = False,
+            foreground_labels: Union[Tuple[int, ...], List[int]] = None,
+            regions: List[Union[List[int], Tuple[int, ...], int]] = None,
+            ignore_label: int = None,
     ) -> AbstractTransform:
 
         ssl_transforms = [
@@ -315,7 +330,7 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
         assert self.queue_size % batch_size == 0  # for simplicity
 
         # replace the keys at ptr (dequeue and enqueue)
-        self.momentum_encoder_network.queue[:, ptr : ptr + batch_size] = keys.T
+        self.momentum_encoder_network.queue[:, ptr: ptr + batch_size] = keys.T
         ptr = (ptr + batch_size) % self.queue_size  # move pointer
 
         self.momentum_encoder_network.queue_ptr[0] = ptr
@@ -326,23 +341,22 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
         Momentum update of the key encoder
         """
         for param_q, param_k in zip(
-            self.network.parameters(), self.momentum_encoder_network.parameters()
+                self.network.parameters(), self.momentum_encoder_network.parameters()
         ):
             param_k.data = (
-                param_k.data * self.encoder_updating_momentum
-                + param_q.data * (1.0 - self.encoder_updating_momentum)
+                    param_k.data * self.encoder_updating_momentum
+                    + param_q.data * (1.0 - self.encoder_updating_momentum)
             )
 
         # we also want to update the weights of the projection layer
-        if self.use_projection_layer:
-            for param_q, param_k in zip(
+        for param_q, param_k in zip(
                 self.query_projection_layer.parameters(),
                 self.key_projection_layer.parameters(),
-            ):
-                param_k.data = (
+        ):
+            param_k.data = (
                     param_k.data * self.encoder_updating_momentum
                     + param_q.data * (1.0 - self.encoder_updating_momentum)
-                )
+            )
 
     @torch.no_grad()
     def _batch_shuffle_ddp(self, x):
