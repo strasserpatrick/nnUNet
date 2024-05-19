@@ -69,6 +69,9 @@ def load_pretrained_weights(network, fname, encoder_only: bool = False, verbose=
         for key, value in pretrained_dict.items():
             print(key, 'shape', value.shape)
         print("################### Done ###################")
-    mod.load_state_dict(model_dict)
+    if encoder_only:
+        mod.encoder.load_state_dict(model_dict)
+    else:
+        mod.load_state_dict(model_dict)
 
 
