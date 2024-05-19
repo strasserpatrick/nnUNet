@@ -4,7 +4,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
 
 
-def load_pretrained_weights(network, fname, verbose=False):
+def load_pretrained_weights(network, fname, encoder_only: bool = False, verbose=False):
     """
     Transfers all weights between matching keys in state_dicts. matching is done by name and we only transfer if the
     shape is also the same. Segmentation layers (the 1x1(x1) layers that produce the segmentation maps)
@@ -33,7 +33,11 @@ def load_pretrained_weights(network, fname, verbose=False):
     if isinstance(mod, OptimizedModule):
         mod = mod._orig_mod
 
-    model_dict = mod.state_dict()
+    if encoder_only:
+        model_dict = mod.encoder.state_dict()
+    else:
+        model_dict = mod.state_dict()
+        
     # verify that all but the segmentation layers have the same shape
     for key, _ in model_dict.items():
         if all([i not in key for i in skip_strings_in_pretrained]):

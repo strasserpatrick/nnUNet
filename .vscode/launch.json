@@ -5,6 +5,21 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python-Debugger: finetuning",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/nnunetv2/run/run_training.py",
+            "console": "internalConsole",
+            "envFile": "${workspaceFolder}/.env",
+            "args": [
+                "43",
+                "3d_fullres",
+                "0",
+                "-encoder_weights",
+                "/home/stud/strasser/nnUNet_exports/Dataset300_BraTS2021_pretraining/nnUNetTrainer_SimCLR__nnUNetPlans_simclr__3d_fullres/fold_all/checkpoint_final.pth"
+            ]
+        },
+        {
             "name": "Python-Debugger run_training",
             "type": "debugpy",
             "request": "launch",
