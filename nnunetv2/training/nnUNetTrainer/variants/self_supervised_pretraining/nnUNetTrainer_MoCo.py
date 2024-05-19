@@ -218,7 +218,7 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
             self._dequeue_and_enqueue(k)
 
             loss = self.loss(logits, labels)
-        return loss
+        return logits, loss
 
     @torch.no_grad()
     def key_forward(self, key_data):

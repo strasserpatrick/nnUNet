@@ -55,6 +55,7 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
             plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
         )
 
+        self.temperature = None
         self.projection_layer = None
 
     def configure_optimizers(self):
@@ -82,10 +83,10 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
             # to keep required gpu memory the same, forward pass is done in two passes.
             data_aug_0, data_aug_1 = torch.chunk(data, 2)
 
-            features_0 = self.network.forward(data_aug_0)
+            features_0 = self.network(data_aug_0)
 
             with torch.no_grad():
-                features_1 = self.network.forward(data_aug_1)
+                features_1 = self.network(data_aug_1)
 
             # plain cnn encoder returns list of all feature maps (len=6 for braTS)
             # we are only interesting in the final result
@@ -119,7 +120,7 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
                 temperature=self.temperature,
             )
             loss = self.loss(logits, labels)
-        return loss
+        return logits, loss
 
     @staticmethod
     def get_training_transforms(

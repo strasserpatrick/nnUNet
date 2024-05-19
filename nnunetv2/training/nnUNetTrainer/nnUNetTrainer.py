@@ -912,7 +912,7 @@ class nnUNetTrainer(object):
             output = self.network(data)
             # del data
             loss = self.loss(output, target)
-        return loss
+        return output, loss
 
     def train_step(self, batch: dict) -> dict:
         data = batch['data']
@@ -928,7 +928,7 @@ class nnUNetTrainer(object):
             target = target.to(self.device, non_blocking=True)
 
         self.optimizer.zero_grad(set_to_none=True)
-        l = self.forward(data=data, target=target)
+        _, l = self.forward(data=data, target=target)
 
         if self.grad_scaler is not None:
             self.grad_scaler.scale(l).backward()
@@ -975,7 +975,7 @@ class nnUNetTrainer(object):
         # If the device_type is 'mps' then it will complain that mps is not implemented, even if enabled=False is set. Whyyyyyyy. (this is why we don't make use of enabled=False)
         # So autocast will only be active if we have a cuda device.
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
-            l = self.forward(data=data, target=target)
+            output, l = self.forward(data=data, target=target)
             del data
 
         # we only need the output with the highest output resolution (if DS enabled)
