@@ -432,6 +432,11 @@ class nnUNetTrainer(object):
         elif dim == 3:
             # todo this is not ideal. We could also have patch_size (64, 16, 128) in which case a full 180deg 2d rot would be bad
             # order of the axes is determined by spacing, not image size
+
+            # we allow a full 180-degree rotation, if the largest dimension is significantly larger than the first
+            # dimension (indicating anisotropy)
+            # if not anisotropic, we restrict the flipping by 30 degrees of freedom per dimension
+            # flipping is allowed for three axes
             do_dummy_2d_data_aug = (max(patch_size) / patch_size[0]) > ANISO_THRESHOLD
             if do_dummy_2d_data_aug:
                 # why do we rotate 180 deg here all the time? We should also restrict it
