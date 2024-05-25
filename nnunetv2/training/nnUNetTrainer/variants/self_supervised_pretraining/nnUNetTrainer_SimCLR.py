@@ -10,7 +10,7 @@ from batchgenerators.transforms.noise_transforms import (
 )
 from batchgenerators.transforms.crop_and_pad_transforms import RandomCropTransform
 from batchgenerators.transforms.utility_transforms import NumpyToTensor
-from batchgenerators.transforms.spatial_transforms import MirrorTransform
+from batchgenerators.transforms.spatial_transforms import MirrorTransform, SpatialTransform, ResizeTransform
 from torch import autocast
 
 from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.ssl_base_trainer import (
@@ -34,11 +34,12 @@ https://medium.com/@prabowoyogawicaksana/self-supervised-pre-training-with-simcl
 class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
     DEFAULT_PARAMS: dict = {
         "temperature": 0.07,
-        "initial_learning_rate": 0.0003,
+        "initial_learning_rate": 0.0001,
         "weight_decay": 1e-4,
         "use_projection_layer": True,
         "latent_space_dim": 8096,
         "num_val_iterations_per_epoch": 0,
+        "num_epochs": 5000
     }
 
     def __init__(
@@ -139,11 +140,23 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
         ignore_label: int = None,
     ) -> AbstractTransform:
 
+        crop_factor = 0.7
+        data_aug_patch_size = [int(crop_factor * val) for val in patch_size]
+
         ssl_transforms = [
-            RandomCropTransform(),
-            GaussianNoiseTransform(p_per_sample=0.8, p_per_channel=0.8),
-            GaussianBlurTransform(p_per_sample=0.8, p_per_channel=0.8),
-            MirrorTransform(p_per_sample=0.3),
+            RandomCropTransform(crop_size=data_aug_patch_size),
+            GaussianNoiseTransform(p_per_sample=0.4, p_per_channel=0.4),
+            GaussianBlurTransform(p_per_sample=0.4, p_per_channel=0.4),
+            MirrorTransform(p_per_sample=0.4),
+            SpatialTransform(
+                patch_size=data_aug_patch_size,
+                angle_x=rotation_for_DA['x'], 
+                angle_y=rotation_for_DA['y'], 
+                angle_z=rotation_for_DA['z'],
+                p_rot_per_axis=1,
+                label_key=None,
+            ),
+            ResizeTransform(target_size=patch_size, label_key=None),
             NumpyToTensor(["data"], "float"),
         ]
 
