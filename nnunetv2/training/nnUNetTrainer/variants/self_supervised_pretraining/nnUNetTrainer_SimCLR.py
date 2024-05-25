@@ -141,7 +141,7 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
     ) -> AbstractTransform:
 
         crop_factor = 0.7
-        data_aug_patch_size = [int(crop_factor * val) for val in patch_size]
+        data_aug_patch_size = tuple(int(crop_factor * val) for val in patch_size)
 
         ssl_transforms = [
             RandomCropTransform(crop_size=data_aug_patch_size),
