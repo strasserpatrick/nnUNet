@@ -97,6 +97,7 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
             plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
         )
 
+        self.projection_layer = None
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
