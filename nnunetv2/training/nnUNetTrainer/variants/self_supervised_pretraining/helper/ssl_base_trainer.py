@@ -44,16 +44,6 @@ class nnUNetBaseTrainer(nnUNetTrainer):
                 # default value
                 setattr(self, attribute_name, self.DEFAULT_PARAMS[attribute_name])
 
-    # disabling nnUNet data augmentation and replacing by SimCLR
-    def configure_rotation_dummyDA_mirroring_and_inital_patch_size(self):
-        # we need to disable mirroring here so that no mirroring will be applied in inferene!
-        rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes = (
-            super().configure_rotation_dummyDA_mirroring_and_inital_patch_size()
-        )
-        mirror_axes = None
-        self.inference_allowed_mirroring_axes = None
-        return rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes
-
     def set_deep_supervision_enabled(self, enabled: bool):
         # we have deep supervision disabled, but as we do not have a decoder here,
         # we have to overwrite this method
