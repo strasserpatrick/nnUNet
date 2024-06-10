@@ -68,6 +68,9 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
             plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
         )
 
+        self.key_projection_layer = None
+        self.query_projection_layer = None
+
     def initialize(self):
         if not self.was_initialized:
             self.num_input_channels = determine_num_input_channels(
