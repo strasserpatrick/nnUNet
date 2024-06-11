@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from typing import Union
+from typing import Union, List, Optional
 
 import numpy as np
+from batchgenerators.utilities.file_and_folder_operations import write_pickle
 
 from nnunetv2.preprocessing.preprocessors.default_preprocessor import DefaultPreprocessor
 from nnunetv2.utilities.plans_handling.plans_handler import ConfigurationManager, PlansManager
@@ -48,13 +49,31 @@ class PCRLv2Preprocessor(DefaultPreprocessor):
                      dataset_json: Union[dict, str]):
         data, _ = super().run_case_npy(data, seg, properties, plans_manager, configuration_manager, dataset_json)
 
-        crop_windows = []
+        result_windows = []
         for i in range(self.config.scale):
             crop_window1, crop_window2, local_windows = self.crop_pair(data)
             crop_window = np.stack((crop_window1, crop_window2), axis=0)
-            crop_windows.append(crop_window)
+            res = (crop_window, local_windows)
+            result_windows.append(res)
 
-        return crop_windows, None
+        return result_windows, None
+
+    def run_case_save(
+            self,
+            output_filename_truncated: str,
+            image_files: List[str],
+            seg_file: Optional[str],
+            plans_manager: PlansManager,
+            configuration_manager: ConfigurationManager,
+            dataset_json: Union[dict, str],
+    ):
+        data, seg, properties = self.run_case(
+            image_files, seg_file, plans_manager, configuration_manager, dataset_json
+        )
+        for i, (crop_window, local_windows) in enumerate(data):
+            np.savez_compressed(f"{output_filename_truncated}_global_{i}.npz", data=crop_window, seg=seg)
+            np.savez_compressed(f"{output_filename_truncated}_local_{i}.npz", data=local_windows, seg=seg)
+        write_pickle(properties, output_filename_truncated + ".pkl")
 
     def crop_pair(self, img_array):
         while True:
@@ -238,8 +257,6 @@ def example_test_case_preprocessing():
         configuration_manager=plans_manager.get_configuration(configuration),
         dataset_json=dataset_json_file,
     )
-
-    return data
 
 
 if __name__ == "__main__":
