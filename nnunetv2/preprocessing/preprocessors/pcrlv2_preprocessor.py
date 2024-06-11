@@ -21,21 +21,18 @@ class PreprocessingConfig:
     :param local_input_depth: int, size of local window in z-axis
     :param len_border: int, length of minimal distance to image boarder in x- and y-axis when cropping global windows
     :param len_border_z: int, length of minimal distance to image boarder in z-axis when cropping global windows
-    :param len_depth: int, z dimensional extension of the global window
     :param col_size_sampling_variants: list, possible sizes for global windows
     :param local_col_size_sampling_variants: list, possible sizes for local windows
     """
     input_rows: int
     input_cols: int
     input_depth: int
-    scale: float
+    scale: int
     local_input_rows: int = 16
     local_input_cols: int = 16
     local_input_depth: int = 16
-    len_border: int = 70
-    len_border_z: int = 15
-    len_depth: int = 3
-    lung_max: float = 0.15
+    len_border: int = 5  # because we cropped already
+    len_border_z: int = 5  # because we cropped already
     col_size_sampling_variants = [(96, 96, 64), (96, 96, 96), (112, 112, 64), (64, 64, 32)]
     local_col_size_sampling_variants = [(32, 32, 16), (16, 16, 16), (32, 32, 32), (8, 8, 8)]
 
@@ -44,7 +41,7 @@ class PCRLv2Preprocessor(DefaultPreprocessor):
     def __init__(self, verbose: bool = True):
         super().__init__(verbose)
 
-        self.config = PreprocessingConfig(input_rows=256, input_cols=256, input_depth=256, scale=6)
+        self.config: PreprocessingConfig = PreprocessingConfig(input_rows=256, input_cols=256, input_depth=256, scale=6)
 
     def run_case_npy(self, data: np.ndarray, seg: Union[np.ndarray, None], properties: dict,
                      plans_manager: PlansManager, configuration_manager: ConfigurationManager,
@@ -61,21 +58,9 @@ class PCRLv2Preprocessor(DefaultPreprocessor):
 
     def crop_pair(self, img_array):
         while True:
-            # TODO: we have four modalities, how to handle them? is this really worth the effort exploring?
-            size_x, size_y, size_z = img_array.shape
+            _, size_x, size_y, size_z = img_array.shape
             img_array1 = img_array.copy()
             img_array2 = img_array.copy()
-
-            # padding the both images on the z axis, if image is too small
-            if size_z - 64 - self.config.len_depth - 1 - self.config.len_border_z < self.config.len_border_z:
-                pad_array1 = size_z - 64 - self.config.len_depth - 1 - self.config.len_border_z - self.config.len_border_z
-                padding_array1 = [0, 0, -pad_array1 + 1]
-                img_array1 = np.pad(img_array1, padding_array1, mode='constant', constant_values=0)
-
-                pad_array2 = size_z - 64 - self.config.len_depth - 1 - self.config.len_border_z - self.config.len_border_z
-                padding_array2 = [0, 0, -pad_array2 + 1]
-                img_array2 = np.pad(img_array2, padding_array2, mode='constant', constant_values=0)
-                size_z += -pad_array2 + 1
 
             # sample the global windows and unpack the boxes
             box_1, box_2, crops = self._sample_global_windows((size_x, size_y, size_z))
@@ -84,66 +69,31 @@ class PCRLv2Preprocessor(DefaultPreprocessor):
             crop_rows1, crop_cols1, crop_deps1, crop_rows2, crop_cols2, crop_deps2 = crops
 
             # crop global view windows out of images
-            crop_window1 = img_array1[start_x1: start_x1 + crop_rows1,
+            crop_window1 = img_array1[:, start_x1: start_x1 + crop_rows1,
                            start_y1: start_y1 + crop_cols1,
-                           start_z1: start_z1 + crop_deps1 + self.config.len_depth,
+                           start_z1: start_z1 + crop_deps1
                            ]
 
-            crop_window2 = img_array2[start_x2: start_x2 + crop_rows2,
+            crop_window2 = img_array2[:, start_x2: start_x2 + crop_rows2,
                            start_y2: start_y2 + crop_cols2,
-                           start_z2: start_z2 + crop_deps2 + self.config.len_depth,
+                           start_z2: start_z2 + crop_deps2
                            ]
 
             # resize crop windows to match self.config.input rows, cols and depth requirements
+            num_modalities = crop_window1.shape[0]
             if crop_rows1 != self.config.input_rows or crop_cols1 != self.config.input_cols or crop_deps1 != self.config.input_depth:
                 crop_window1 = resize(crop_window1,
-                                      (self.config.input_rows, self.config.input_cols,
-                                       self.config.input_depth + self.config.len_depth),
+                                      (num_modalities, self.config.input_rows, self.config.input_cols,
+                                       self.config.input_depth),
                                       preserve_range=True,
                                       )
             if crop_rows2 != self.config.input_rows or crop_cols2 != self.config.input_cols or crop_deps2 != self.config.input_depth:
                 crop_window2 = resize(crop_window2,
-                                      (self.config.input_rows, self.config.input_cols,
-                                       self.config.input_depth + self.config.len_depth),
+                                      (num_modalities, self.config.input_rows, self.config.input_cols,
+                                       self.config.input_depth),
                                       preserve_range=True,
                                       )
-            t_img1 = np.zeros((self.config.input_rows, self.config.input_cols, self.config.input_depth), dtype=float)
-            d_img1 = np.zeros((self.config.input_rows, self.config.input_cols, self.config.input_depth), dtype=float)
-            t_img2 = np.zeros((self.config.input_rows, self.config.input_cols, self.config.input_depth), dtype=float)
-            d_img2 = np.zeros((self.config.input_rows, self.config.input_cols, self.config.input_depth), dtype=float)
-            for d in range(self.config.input_depth):
-                for i in range(self.config.input_rows):
-                    for j in range(self.config.input_cols):
-                        for k in range(self.config.len_depth):
-                            if crop_window1[
-                                i, j, d + k] >= self.config.HU_thred:  # TODO: what does that mean? how to set it for z-normalization?
-                                t_img1[i, j, d] = crop_window1[i, j, d + k]
-                                d_img1[i, j, d] = k
-                                break
-                            if k == self.config.len_depth - 1:
-                                d_img1[i, j, d] = k
-            for d in range(self.config.input_depth):
-                for i in range(self.config.input_rows):
-                    for j in range(self.config.input_cols):
-                        for k in range(self.config.len_depth):
-                            if crop_window2[i, j, d + k] >= self.config.HU_thred:
-                                t_img2[i, j, d] = crop_window2[i, j, d + k]
-                                d_img2[i, j, d] = k
-                                break
-                            if k == self.config.len_depth - 1:
-                                d_img2[i, j, d] = k
 
-            d_img1 = d_img1.astype('float32')
-            d_img1 /= (self.config.len_depth - 1)
-            d_img1 = 1.0 - d_img1
-            d_img2 = d_img2.astype('float32')
-            d_img2 /= (self.config.len_depth - 1)
-            d_img2 = 1.0 - d_img2
-
-            if np.sum(d_img1) > self.config.lung_max * crop_cols1 * crop_deps1 * crop_rows1:
-                continue
-            if np.sum(d_img2) > self.config.lung_max * crop_cols1 * crop_deps1 * crop_rows1:
-                continue
             # we start to crop the local windows
             x_min = min(start_x1, start_x2)
             x_max = max(end_x1, end_x2)
@@ -159,19 +109,19 @@ class PCRLv2Preprocessor(DefaultPreprocessor):
                 local_size_index = np.random.randint(0, len(self.config.local_col_size_sampling_variants))
                 local_crop_rows, local_crop_cols, local_crop_deps = self.config.local_col_size_sampling_variants[
                     local_size_index]
-                local_window = img_array1[local_x: local_x + local_crop_rows,
+                local_window = img_array1[:, local_x: local_x + local_crop_rows,
                                local_y: local_y + local_crop_cols,
                                local_z: local_z + local_crop_deps
                                ]
                 # if local_crop_rows != local_input_rows or local_crop_cols != local_input_cols or local_crop_deps != local_input_depth:
+                num_modalities = local_window.shape[0]
                 local_window = resize(local_window,
-                                      (self.config.local_input_rows, self.config.local_input_cols,
+                                      (num_modalities, self.config.local_input_rows, self.config.local_input_cols,
                                        self.config.local_input_depth),
                                       preserve_range=True,
                                       )
                 local_windows.append(local_window)
-            return crop_window1[:, :, :self.config.input_depth], crop_window2[:, :, :self.config.input_depth], np.stack(
-                local_windows, axis=0)
+            return crop_window1, crop_window2, np.stack(local_windows, axis=0)
 
     def _sample_global_windows(self, image_sizes, min_iou: float = 0.3):
         """
@@ -209,13 +159,13 @@ class PCRLv2Preprocessor(DefaultPreprocessor):
             start_y1 = np.random.randint(0 + self.config.len_border,
                                          size_y - crop_cols1 - 1 - self.config.len_border)
             start_z1 = np.random.randint(0 + self.config.len_border_z,
-                                         size_z - crop_deps1 - self.config.len_depth - 1 - self.config.len_border_z)
+                                         size_z - crop_deps1 - 1 - self.config.len_border_z)
             start_x2 = np.random.randint(0 + self.config.len_border,
                                          size_x - crop_rows2 - 1 - self.config.len_border)
             start_y2 = np.random.randint(0 + self.config.len_border,
                                          size_y - crop_cols2 - 1 - self.config.len_border)
             start_z2 = np.random.randint(0 + self.config.len_border_z,
-                                         size_z - crop_deps2 - self.config.len_depth - 1 - self.config.len_border_z)
+                                         size_z - crop_deps2 - 1 - self.config.len_border_z)
             box1 = (
                 start_x1, start_x1 + crop_rows1, start_y1, start_y1 + crop_cols1, start_z1, start_z1 + crop_deps1)
             box2 = (
