@@ -1,0 +1,32 @@
+from typing import Tuple
+
+from nnunetv2.training.dataloading.pcrlv2_data_loader import nnUNetDataLoaderPCRLv2
+from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.ssl_base_trainer import \
+    nnUNetBaseTrainer
+
+
+class nnUNetTrainer_PCRLv2(nnUNetBaseTrainer):
+
+    def forward(self, data, target):
+        print("hello")
+
+    def get_plain_dataloaders(self, initial_patch_size: Tuple[int, ...], dim: int):
+        dataset_tr, dataset_val = self.get_tr_and_val_datasets()
+
+        assert dim == 3, "Only 3D is supported"
+
+        # TODO: note that the different arguments are not used in the PCRLv2 data loader
+        dl_tr = nnUNetDataLoaderPCRLv2(dataset_tr, self.batch_size,
+                                       initial_patch_size,
+                                       self.configuration_manager.patch_size,
+                                       self.label_manager,
+                                       oversample_foreground_percent=self.oversample_foreground_percent,
+                                       sampling_probabilities=None, pad_sides=None)
+        dl_val = nnUNetDataLoaderPCRLv2(dataset_val, self.batch_size,
+                                        self.configuration_manager.patch_size,
+                                        self.configuration_manager.patch_size,
+                                        self.label_manager,
+                                        oversample_foreground_percent=self.oversample_foreground_percent,
+                                        sampling_probabilities=None, pad_sides=None)
+
+        return dl_tr, dl_val
