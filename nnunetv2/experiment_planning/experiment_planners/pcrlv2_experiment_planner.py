@@ -21,3 +21,7 @@ class PCRLv2ExperimentPlanner(PretrainingExperimentPlanner):
             overwrite_target_spacing=overwrite_target_spacing,
             suppress_transpose=suppress_transpose,
         )
+
+        # TODO: specify that unet needs to return feature maps here
+        # TODO: check if we need the decoder, I think we do!
+        # TODO: set non-skip here as well

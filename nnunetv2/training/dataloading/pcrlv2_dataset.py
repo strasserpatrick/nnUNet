@@ -2,10 +2,9 @@ import os
 from typing import List
 
 import numpy as np
-from batchgenerators.utilities.file_and_folder_operations import load_pickle, join, isfile
+from batchgenerators.utilities.file_and_folder_operations import load_pickle, join
 
 from nnunetv2.training.dataloading.nnunet_dataset import nnUNetDataset
-from nnunetv2.training.dataloading.utils import get_case_identifiers
 
 
 class PCRLv2Dataset(nnUNetDataset):
