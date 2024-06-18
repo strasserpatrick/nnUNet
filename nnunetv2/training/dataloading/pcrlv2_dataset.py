@@ -38,6 +38,7 @@ class PCRLv2Dataset(nnUNetDataset):
                                (os.environ['nnUNet_keep_files_open'].lower() in ('true', '1', 't'))
         # print(f'nnUNetDataset.keep_files_open: {self.keep_files_open}')
 
+
     def load_case(self, key):
         entry = self[key]
         if 'open_data_file' in entry.keys():
