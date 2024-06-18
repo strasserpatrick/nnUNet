@@ -20,9 +20,11 @@ class PCRLv2Dataset(nnUNetDataset):
         self.dataset = {}
         for c in case_identifiers:
             self.dataset[c] = {}
-            self.dataset[c]['global_view_files'] = [join(folder, f"{c}_global_{i}.npz") for i in range(6)]
-            self.dataset[c]['local_view_files'] = [join(folder, f"{c}_local_{i}.npz") for i in range(6)]
-            self.dataset[c]['properties_file'] = join(folder, f"{c}.pkl")
+            self.dataset[c]['global_view_file'] = join(folder, f"{c}.npz")
+            local_cid = c.replace("global", "local")
+            self.dataset[c]['local_view_file'] = join(folder, f"{local_cid}.npz")
+            properties_cid = "_".join(c.split("_")[:-2])
+            self.dataset[c]['properties_file'] = join(folder, f"{properties_cid}.pkl")
             if folder_with_segs_from_previous_stage is not None:
                 self.dataset[c]['seg_from_prev_stage_file'] = join(folder_with_segs_from_previous_stage, f"{c}.npz")
 
@@ -35,22 +37,20 @@ class PCRLv2Dataset(nnUNetDataset):
         # print(f'nnUNetDataset.keep_files_open: {self.keep_files_open}')
 
     def _load_case_identifiers(self, folder):
-        case_identifiers = [i[:-4] for i in os.listdir(folder) if i.endswith("pkl") and (i.find("segFromPrevStage") == -1)]
+        case_identifiers = []
+        for fn in os.listdir(folder):
+            if fn.endswith(".npz") and (fn.find("segFromPrevStage") == -1) and (fn.find("global") != -1):
+                cid = fn[:-4]
+                case_identifiers.append(cid)
         return case_identifiers 
 
     def load_case(self, key):
         entry = self[key]
         if 'open_data_file' in entry.keys():
             data = entry['open_data_file']
-            # print('using open data file')
         else:
-            # data = np.load(entry['data_file'][:-4] + ".npy", 'r')
-            data = {"global": [], "local": []}
-
-            for file in entry['global_view_files']:
-                data["global"].append(np.load(file)['data'])
-            for file in entry['local_view_files']:
-                data["local"].append(np.load(file)['data'])
+            data['global'] = np.load(entry["global_view_file"])
+            data['local'] = np.load(entry["local_view_file"])
 
             if self.keep_files_open:
                 self.dataset[key]['open_data_file'] = data
