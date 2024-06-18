@@ -15,11 +15,7 @@ class PCRLv2Dataset(nnUNetDataset):
 
         super().__init__(folder, case_identifiers, num_images_properties_loading_threshold,
                          folder_with_segs_from_previous_stage)
-        # print('loading dataset')
-        if case_identifiers is None:
-            file_names = [i for i in os.listdir(folder) if i.endswith("npz") and (i.find("segFromPrevStage") == -1)]
-            case_identifiers = ["_".join(i.split("_")[:-2]) for i in file_names]
-        case_identifiers.sort()
+        case_identifiers = self._load_case_identifiers(folder)
 
         self.dataset = {}
         for c in case_identifiers:
@@ -38,6 +34,16 @@ class PCRLv2Dataset(nnUNetDataset):
                                (os.environ['nnUNet_keep_files_open'].lower() in ('true', '1', 't'))
         # print(f'nnUNetDataset.keep_files_open: {self.keep_files_open}')
 
+    def _load_case_identifiers(self, folder):
+        case_identifiers = [i[:-4] for i in os.listdir(folder) if i.endswith("pkl") and (i.find("segFromPrevStage") == -1)]
+        return case_identifiers 
+
+    def __getitem__(self, key):
+        ret = {**self.dataset[key]}
+        if 'properties' not in ret.keys():
+            ret['properties'] = load_pickle(ret['properties_file'])
+        return ret
+
     def load_case(self, key):
         entry = self[key]
         if 'open_data_file' in entry.keys():
@@ -54,6 +60,5 @@ class PCRLv2Dataset(nnUNetDataset):
 
             if self.keep_files_open:
                 self.dataset[key]['open_data_file'] = data
-                # print('saving open data file')
 
-        return data, None, entry['properties']
+        return data, None, entry["properties"]

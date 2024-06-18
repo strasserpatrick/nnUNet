@@ -24,9 +24,9 @@
                 "3d_fullres",
                 "all",
                 "-tr",
-                "nnUNetTrainer_SimCLR",
+                "nnUNetTrainer_PCRLv2",
                 "-p",
-                "nnUNetPreprocessPlans",
+                "nnUNetPreprocessPlansPCRLv2",
                 "--foo=bar"
             ]
         }
