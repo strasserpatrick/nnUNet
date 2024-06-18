@@ -49,6 +49,7 @@ class PCRLv2Dataset(nnUNetDataset):
         if 'open_data_file' in entry.keys():
             data = entry['open_data_file']
         else:
+            data = {}
             data['global'] = np.load(entry["global_view_file"])
             data['local'] = np.load(entry["local_view_file"])
 

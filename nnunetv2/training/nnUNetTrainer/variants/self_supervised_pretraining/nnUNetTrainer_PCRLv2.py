@@ -1,15 +1,37 @@
-from typing import Tuple
+from typing import List, Tuple, Union
+
+import numpy as np
 
 from nnunetv2.training.dataloading.pcrlv2_data_loader import nnUNetDataLoaderPCRLv2
 from nnunetv2.training.dataloading.pcrlv2_dataset import PCRLv2Dataset
+from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.pcrlv2_transform import PCRLv2Transform
 from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.ssl_base_trainer import \
     nnUNetBaseTrainer
 
+from batchgenerators.transforms.abstract_transforms import AbstractTransform
 
 class nnUNetTrainer_PCRLv2(nnUNetBaseTrainer):
 
     def forward(self, data, target):
         print("hello")
+
+    @staticmethod
+    def get_training_transforms(
+        patch_size: Union[np.ndarray, Tuple[int]],
+        rotation_for_DA: dict,
+        deep_supervision_scales: Union[List, Tuple, None],
+        mirror_axes: Tuple[int, ...],
+        do_dummy_2d_data_aug: bool,
+        order_resampling_data: int = 3,
+        order_resampling_seg: int = 1,
+        border_val_seg: int = -1,
+        use_mask_for_norm: List[bool] = None,
+        is_cascaded: bool = False,
+        foreground_labels: Union[Tuple[int, ...], List[int]] = None,
+        regions: List[Union[List[int], Tuple[int, ...], int]] = None,
+        ignore_label: int = None,
+    ) -> AbstractTransform:
+        return PCRLv2Transform()   
 
     def get_tr_and_val_datasets(self):
         tr_keys, val_keys = self.do_split()
