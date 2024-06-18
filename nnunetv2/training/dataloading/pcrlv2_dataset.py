@@ -45,15 +45,20 @@ class PCRLv2Dataset(nnUNetDataset):
         return case_identifiers 
 
     def load_case(self, key):
+        # we load global as data and local as seg to keep the flow
         entry = self[key]
         if 'open_data_file' in entry.keys():
-            data = entry['open_data_file']
+            global_data = entry['open_data_file']
         else:
-            data = {}
-            data['global'] = np.load(entry["global_view_file"])
-            data['local'] = np.load(entry["local_view_file"])
-
+            global_data = np.load(entry["global_view_file"], 'r')['data']
             if self.keep_files_open:
-                self.dataset[key]['open_data_file'] = data
+                self.dataset[key]['open_data_file'] = global_data
 
-        return data, None, entry["properties"]
+        if 'open_seg_file' in entry.keys():
+            local_data = entry['open_seg_file']
+        else:
+            local_data = np.load(entry["local_view_file"], 'r')['data']
+            if self.keep_files_open:
+                self.dataset[key]['open_seg_file'] = local_data
+             
+        return global_data, local_data, entry["properties"]

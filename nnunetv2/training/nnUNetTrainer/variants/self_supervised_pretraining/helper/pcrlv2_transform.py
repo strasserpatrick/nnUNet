@@ -1,4 +1,5 @@
 from batchgenerators.transforms.abstract_transforms import AbstractTransform, Compose
+from batchgenerators.transforms.utility_transforms import NumpyToTensor
 from torchio.transforms import (
     Compose,
     RandomFlip,
@@ -13,6 +14,7 @@ from torchio.transforms import (
 import copy
 import numpy as np
 import torch
+
 
 class PCRLv2Transform(AbstractTransform):
     def __init__(self):
@@ -43,34 +45,40 @@ class PCRLv2Transform(AbstractTransform):
         )
 
     def __call__(self, **data_dict):
+        converted_data_dict = NumpyToTensor(keys=["global", "local"])(**data_dict)
+        return self.pclr_transform(**converted_data_dict)
 
-        # extract data
-        global_data = data_dict['data']['global']
-        local_data = data_dict['data']['local']
+    def pclr_transform(self, **data_dict):
+        global_data = data_dict["global"]
+        local_data = data_dict["local"]
 
-        global_img_1 = np.expand_dims(global_data[0], axis=0)
-        global_img_2 = np.expand_dims(global_data[1], axis=0)
+        global_img_1 = global_data[:, 0]
+        global_img_2 = global_data[:, 1]
 
-        input_1 = self.spatial_transforms(global_img_1)
-        input_2 = self.spatial_transforms(global_img_2)
+        # iterate over batch dimension because torchio only allows 4D tensors
+        # https://github.com/fepegar/torchio/discussions/562
+        input_1 = torch.stack([self.spatial_transforms(inst) for inst in global_img_1])
+        input_2 = torch.stack([self.spatial_transforms(inst) for inst in global_img_2])
 
         gt_1 = copy.deepcopy(input_1)
         gt_2 = copy.deepcopy(input_2)
 
-        input1 = self.global_transforms(input1)
-        input2 = self.global_transforms(input2)
+        input_1 = torch.stack([self.global_transforms(inst) for inst in input_1])
+        input_2 = torch.stack([self.global_transforms(inst) for inst in input_2])
 
-        local_input = []
-        for i in range(local_data.shape[0]):
-            local_img = np.expand_dims(local_data[i], axis=0)
-            local_img = self.spatial_transforms(local_img)
-            local_img = self.local_transforms(local_img)
-            local_input.append(local_img)
+        local_inputs = []
+        for i in range(local_data.shape[1]):
+            local_img = local_data[:, i]
+            local_img = torch.stack([self.spatial_transforms(inst) for inst in local_img])
+            local_img = torch.stack([self.local_transforms(inst) for inst in local_img])
+            local_inputs.append(local_img)
 
-        return (
-            torch.tensor(input_1, dtype=torch.float),
-            torch.tensor(input_2, dtype=torch.float),
-            torch.tensor(gt_1, dtype=torch.float),
-            torch.tensor(gt_2, dtype=torch.float),
-            local_input,
-        )
+        return {
+            "input_1": input_1,
+            "input_2": input_2,
+            "gt_1": gt_1,
+            "gt_2": gt_2,
+            "local_inputs": torch.stack(local_inputs),
+            "properties": data_dict["properties"],
+            "keys": data_dict["keys"],
+        }
