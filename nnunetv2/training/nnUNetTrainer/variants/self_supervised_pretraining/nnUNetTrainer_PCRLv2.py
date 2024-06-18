@@ -12,7 +12,6 @@ class nnUNetTrainer_PCRLv2(nnUNetBaseTrainer):
         print("hello")
 
     def get_tr_and_val_datasets(self):
-        # create dataset split
         tr_keys, val_keys = self.do_split()
 
         # load the datasets for training and validation. Note that we always draw random samples so we really don't

@@ -38,12 +38,6 @@ class PCRLv2Dataset(nnUNetDataset):
         case_identifiers = [i[:-4] for i in os.listdir(folder) if i.endswith("pkl") and (i.find("segFromPrevStage") == -1)]
         return case_identifiers 
 
-    def __getitem__(self, key):
-        ret = {**self.dataset[key]}
-        if 'properties' not in ret.keys():
-            ret['properties'] = load_pickle(ret['properties_file'])
-        return ret
-
     def load_case(self, key):
         entry = self[key]
         if 'open_data_file' in entry.keys():
