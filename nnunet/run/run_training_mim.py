@@ -122,7 +122,7 @@ def main():
         fold = int(fold)
 
     plans_file, output_folder_name, dataset_directory, stage, \
-    trainer_class = get_my_configuration(network, task, network_trainer, plans_identifier, loss='MSE')
+    trainer_class = get_my_configuration(network, task, network_trainer, plans_identifier)
 
     if network_trainer == 'mgTrainer':
         output_folder_name = os.path.join(os.path.split(output_folder_name)[0], 'model_gensis')
