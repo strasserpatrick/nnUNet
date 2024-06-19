@@ -1,5 +1,7 @@
 from nnunetv2.training.dataloading.base_data_loader import nnUNetDataLoaderBase
 
+import numpy as np
+
 
 class nnUNetContrastiveDataLoader(nnUNetDataLoaderBase):
 
@@ -9,12 +11,23 @@ class nnUNetContrastiveDataLoader(nnUNetDataLoaderBase):
     def generate_train_batch(self):
         selected_keys = self.get_indices()
         # preallocate memory for data and seg
-        data_all = []
-        case_properties = []
+        global_data = []
+        local_data = []
 
-        for j, i in enumerate(selected_keys):
-            data, seg, properties = self._data.load_case(i)
-            data_all.append(data)
-            case_properties.append(properties)
+        case_properties = None
 
-        return {'data': data_all, 'seg': None, 'properties': case_properties, 'keys': selected_keys}
+        for i in selected_keys:
+            glob, loc, properties = self._data.load_case(i)
+            global_data.append(glob)
+            local_data.append(loc)
+
+            # properties is same for every case in this implementation
+            if case_properties is None:
+                case_properties = properties
+
+        return {
+            "global": np.stack(global_data, axis=0),
+            "local": np.stack(local_data, axis=0),
+            "properties": case_properties,
+            "keys": selected_keys,
+        }
