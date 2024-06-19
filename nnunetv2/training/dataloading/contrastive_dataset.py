@@ -7,7 +7,7 @@ from batchgenerators.utilities.file_and_folder_operations import load_pickle, jo
 from nnunetv2.training.dataloading.nnunet_dataset import nnUNetDataset
 
 
-class PCRLv2Dataset(nnUNetDataset):
+class ContrastiveDataset(nnUNetDataset):
 
     def __init__(self, folder: str, case_identifiers: List[str] = None,
                  num_images_properties_loading_threshold: int = 0,
