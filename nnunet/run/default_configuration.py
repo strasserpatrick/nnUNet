@@ -78,3 +78,9 @@ def get_default_configuration(network, task, network_trainer, plans_identifier=d
     print("\nI am using data from this folder: ", join(dataset_directory, plans['data_identifier']))
     print("###############################################")
     return plans_file, output_folder_name, dataset_directory, batch_dice, stage, trainer_class
+
+
+def get_my_configuration(network, task, network_trainer, plans_identifier=default_plans_identifier,
+                         search_in=(nnunet.__path__[0], "training", "network_training"),
+                         base_module='nnunet.training.network_training'):
+    return get_default_configuration(network, task, network_trainer, plans_identifier, search_in, base_module)

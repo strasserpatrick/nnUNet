@@ -60,7 +60,7 @@ class SegmentationNetwork(NeuralNetwork):
         self.num_classes = None  # number of channels in the output
 
         # depending on the loss, we do not hard code a nonlinearity into the architecture. To aggregate predictions
-        # during inference, we need to apply the nonlinearity, however. So it is important to let the newtork know what
+        # during inference, we need to apply the nonlinearity, however. So it is important to let the network know what
         # to apply in inference. For the most part this will be softmax
         self.inference_apply_nonlin = lambda x: x  # softmax_helper
 
