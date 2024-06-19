@@ -110,12 +110,13 @@ def process_portion(brats_data_dir, out_foldername, case_ids):
 
 
 def preprocess_brats21(pretrain_ratio: float, task_id_pretrain=333, task_id_finetune=334, task_name_prefix="BraTS2021"):
-    task_name = f"{task_name_prefix}_{pretrain_ratio:.1f}".replace(".", "_")
+    brats_data_dir = '/Users/patricks/Downloads/brats2021/BraTS2021_Training_Data'
 
-    brats_data_dir = '/home/stud/strasser/archive/brats2021'
+    pretrain_task_name = f"{task_name_prefix}_{pretrain_ratio:.1f}".replace(".", "_")
+    pretrain_foldername = f"Dataset{task_id_pretrain:03.0f}_{pretrain_task_name}"
 
-    pretrain_foldername = f"Dataset{task_id_pretrain:03.0f}_{task_name}"
-    finetune_foldername = f"Dataset{task_id_finetune:03.0f}_{task_name}"
+    finetune_task_name = f"{task_name_prefix}_{1 - pretrain_ratio:.1f}".replace(".", "_")
+    finetune_foldername = f"Dataset{task_id_finetune:03.0f}_{finetune_task_name}"
 
     case_ids = subdirs(brats_data_dir, prefix='BraTS', join=False)
     pretrain_case_ids, finetuning_case_ids = split_cases(case_ids, pretrain_ratio)
