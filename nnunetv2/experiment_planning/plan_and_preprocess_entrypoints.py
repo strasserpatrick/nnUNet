@@ -201,4 +201,4 @@ def plan_and_preprocess_entry():
 
 
 if __name__ == '__main__':
-    plan_and_preprocess_entry()
+    preprocess_entry()
