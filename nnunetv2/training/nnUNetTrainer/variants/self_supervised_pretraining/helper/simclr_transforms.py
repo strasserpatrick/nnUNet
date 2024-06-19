@@ -9,7 +9,7 @@ from torchio.transforms import (
 )
 
 
-class PCRLv2Transform(AbstractTransform):
+class SimCLRTransform(AbstractTransform):
     def __init__(self):
         self.contrastive_transforms = Compose([
             RandomFlip(),
