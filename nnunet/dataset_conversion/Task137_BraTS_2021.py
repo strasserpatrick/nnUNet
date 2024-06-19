@@ -644,7 +644,7 @@ def preprocess_brats21(task_id=137, task_name="BraTS2021", excluded_case_ids=Non
         """
 
     task_name = f"Task{task_id}_{task_name}"
-    downloaded_data_dir = "/Users/patricks/Downloads/brats2021/BraTS2021_Training_Data"
+    downloaded_data_dir = "/home/stud/strasser/archive/brats2021"
 
     if excluded_case_ids is None:
         excluded_case_ids = []

@@ -48,17 +48,13 @@ if __name__ == "__main__":
     """
 
     task_name = "Task043_BraTS2019"
-    downloaded_data_dir = "/home/sdp/MLPERF/Brats2019_DATA/MICCAI_BraTS_2019_Data_Training"
+    downloaded_data_dir = "/home/stud/strasser/archive/brats2019/MICCAI_BraTS_2019_Data_Training"
 
     target_base = join(nnUNet_raw_data, task_name)
     target_imagesTr = join(target_base, "imagesTr")
-    target_imagesVal = join(target_base, "imagesVal")
-    target_imagesTs = join(target_base, "imagesTs")
     target_labelsTr = join(target_base, "labelsTr")
 
     maybe_mkdir_p(target_imagesTr)
-    maybe_mkdir_p(target_imagesVal)
-    maybe_mkdir_p(target_imagesTs)
     maybe_mkdir_p(target_labelsTr)
 
     patient_names = []
@@ -68,11 +64,11 @@ if __name__ == "__main__":
             patdir = join(cur, p)
             patient_name = tpe + "__" + p
             patient_names.append(patient_name)
-            t1 = join(patdir, p + "_t1.nii.gz")
-            t1c = join(patdir, p + "_t1ce.nii.gz")
-            t2 = join(patdir, p + "_t2.nii.gz")
-            flair = join(patdir, p + "_flair.nii.gz")
-            seg = join(patdir, p + "_seg.nii.gz")
+            t1 = join(patdir, p + "_t1.nii")
+            t1c = join(patdir, p + "_t1ce.nii")
+            t2 = join(patdir, p + "_t2.nii")
+            flair = join(patdir, p + "_flair.nii")
+            seg = join(patdir, p + "_seg.nii")
 
             assert all([
                 isfile(t1),
@@ -116,28 +112,6 @@ if __name__ == "__main__":
     json_dict['test'] = []
 
     save_json(json_dict, join(target_base, "dataset.json"))
-
-    downloaded_data_dir = "/home/sdp/MLPERF/Brats2019_DATA/MICCAI_BraTS_2019_Data_Validation"
-
-    for p in subdirs(downloaded_data_dir, join=False):
-        patdir = join(downloaded_data_dir, p)
-        patient_name = p
-        t1 = join(patdir, p + "_t1.nii.gz")
-        t1c = join(patdir, p + "_t1ce.nii.gz")
-        t2 = join(patdir, p + "_t2.nii.gz")
-        flair = join(patdir, p + "_flair.nii.gz")
-
-        assert all([
-            isfile(t1),
-            isfile(t1c),
-            isfile(t2),
-            isfile(flair),
-        ]), "%s" % patient_name
-
-        shutil.copy(t1, join(target_imagesVal, patient_name + "_0000.nii.gz"))
-        shutil.copy(t1c, join(target_imagesVal, patient_name + "_0001.nii.gz"))
-        shutil.copy(t2, join(target_imagesVal, patient_name + "_0002.nii.gz"))
-        shutil.copy(flair, join(target_imagesVal, patient_name + "_0003.nii.gz"))
 
     """
     #I dont have the testing data
