@@ -4,6 +4,7 @@
     // Weitere Informationen finden Sie unter https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+    
         {
             "name": "Python-Debugger: Aktuelle Datei",
             "type": "debugpy",
@@ -12,7 +13,26 @@
             "console": "internalConsole"
         },
         {
-            "name": "Python-Debugger run_training",
+            "name": "Python-Debugger run_training PCRLv2",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/nnunetv2/run/run_training.py",
+            "console": "internalConsole",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env",
+            "args": [
+                "300",
+                "3d_fullres",
+                "all",
+                "-tr",
+                "nnUNetTrainer_PCRLv2",
+                "-p",
+                "nnUNetPreprocessPlansPCRLv2",
+                "--foo=bar"
+            ]
+        },
+        {
+            "name": "Python-Debugger run_training SimCLR",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/nnunetv2/run/run_training.py",
@@ -26,7 +46,7 @@
                 "-tr",
                 "nnUNetTrainer_SimCLR",
                 "-p",
-                "nnUNetPreprocessPlans",
+                "nnUNetPlans_simclr",
                 "--foo=bar"
             ]
         }

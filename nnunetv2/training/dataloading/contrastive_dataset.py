@@ -15,18 +15,16 @@ class ContrastiveDataset(nnUNetDataset):
 
         super().__init__(folder, case_identifiers, num_images_properties_loading_threshold,
                          folder_with_segs_from_previous_stage)
-        # print('loading dataset')
-        if case_identifiers is None:
-            file_names = [i for i in os.listdir(folder) if i.endswith("npz") and (i.find("segFromPrevStage") == -1)]
-            case_identifiers = ["_".join(i.split("_")[:-2]) for i in file_names]
-        case_identifiers.sort()
+        case_identifiers = self._load_case_identifiers(folder)
 
         self.dataset = {}
         for c in case_identifiers:
             self.dataset[c] = {}
-            self.dataset[c]['global_view_files'] = [join(folder, f"{c}_global_{i}.npz") for i in range(6)]
-            self.dataset[c]['local_view_files'] = [join(folder, f"{c}_local_{i}.npz") for i in range(6)]
-            self.dataset[c]['properties_file'] = join(folder, f"{c}.pkl")
+            self.dataset[c]['global_view_file'] = join(folder, f"{c}.npz")
+            local_cid = c.replace("global", "local")
+            self.dataset[c]['local_view_file'] = join(folder, f"{local_cid}.npz")
+            properties_cid = "_".join(c.split("_")[:-2])
+            self.dataset[c]['properties_file'] = join(folder, f"{properties_cid}.pkl")
             if folder_with_segs_from_previous_stage is not None:
                 self.dataset[c]['seg_from_prev_stage_file'] = join(folder_with_segs_from_previous_stage, f"{c}.npz")
 
@@ -38,23 +36,29 @@ class ContrastiveDataset(nnUNetDataset):
                                (os.environ['nnUNet_keep_files_open'].lower() in ('true', '1', 't'))
         # print(f'nnUNetDataset.keep_files_open: {self.keep_files_open}')
 
+    def _load_case_identifiers(self, folder):
+        case_identifiers = []
+        for fn in os.listdir(folder):
+            if fn.endswith(".npz") and (fn.find("segFromPrevStage") == -1) and (fn.find("global") != -1):
+                cid = fn[:-4]
+                case_identifiers.append(cid)
+        return case_identifiers 
 
     def load_case(self, key):
+        # we load global as data and local as seg to keep the flow
         entry = self[key]
         if 'open_data_file' in entry.keys():
-            data = entry['open_data_file']
-            # print('using open data file')
+            global_data = entry['open_data_file']
         else:
-            # data = np.load(entry['data_file'][:-4] + ".npy", 'r')
-            data = {"global": [], "local": []}
-
-            for file in entry['global_view_files']:
-                data["global"].append(np.load(file)['data'])
-            for file in entry['local_view_files']:
-                data["local"].append(np.load(file)['data'])
-
+            global_data = np.load(entry["global_view_file"], 'r')['data']
             if self.keep_files_open:
-                self.dataset[key]['open_data_file'] = data
-                # print('saving open data file')
+                self.dataset[key]['open_data_file'] = global_data
 
-        return data, None, entry['properties']
+        if 'open_seg_file' in entry.keys():
+            local_data = entry['open_seg_file']
+        else:
+            local_data = np.load(entry["local_view_file"], 'r')['data']
+            if self.keep_files_open:
+                self.dataset[key]['open_seg_file'] = local_data
+             
+        return global_data, local_data, entry["properties"]
