@@ -48,7 +48,8 @@ class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
         "weight_decay": 1e-4,
         "use_cosine_schedule": False,
         "temperature": 0.07,
-        "queue_size": 65535,
+        "queue_size": 65536,
+        "batch_size": 8,  # queue_size % batch_size has to be zero
         "encoder_updating_momentum": 0.999,
         "projection_layer_dimension": 128,
         "num_val_iterations_per_epoch": 0,
