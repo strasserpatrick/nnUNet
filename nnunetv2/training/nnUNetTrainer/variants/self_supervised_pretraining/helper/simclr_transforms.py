@@ -30,10 +30,10 @@ class SimCLRTransform(AbstractTransform):
 
         # iterate over batch dimension because torchio only allows 4D tensors
         # https://github.com/fepegar/torchio/discussions/562
-        input_1 = torch.stack([self.contrastive_transforms(inst) for inst in img_1])
-        input_2 = torch.stack([self.contrastive_transforms(inst) for inst in img_2])
+        view_1 = torch.stack([self.contrastive_transforms(inst) for inst in img_1])
+        view_2 = torch.stack([self.contrastive_transforms(inst) for inst in img_2])
 
         return {
-            "input_1": input_1,
-            "input_2": input_2,
+            "view_1": view_1,
+            "view_2": view_2,
         }

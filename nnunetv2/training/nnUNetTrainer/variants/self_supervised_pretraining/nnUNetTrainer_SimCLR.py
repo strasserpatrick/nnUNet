@@ -5,13 +5,19 @@ import numpy as np
 import torch
 from torch import autocast
 
-from nnunetv2.training.dataloading.contrastive_data_loader import nnUNetContrastiveDataLoader
+from nnunetv2.training.dataloading.contrastive_data_loader import (
+    nnUNetContrastiveDataLoader,
+)
 from nnunetv2.training.dataloading.contrastive_dataset import ContrastiveDataset
-from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.loss_functions import info_nce_loss
-from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.simclr_transforms import \
-    SimCLRTransform
-from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.ssl_base_trainer import \
-    nnUNetBaseTrainer
+from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.loss_functions import (
+    info_nce_loss,
+)
+from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.simclr_transforms import (
+    SimCLRTransform,
+)
+from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.ssl_base_trainer import (
+    nnUNetBaseTrainer,
+)
 
 from batchgenerators.transforms.abstract_transforms import AbstractTransform
 
@@ -26,19 +32,19 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
         "use_projection_layer": True,
         "latent_space_dim": 512,
         "num_val_iterations_per_epoch": 0,
-        "batch_size": 128,
+        "batch_size": 1,
         "num_epochs": 100,
     }
 
     def __init__(
-            self,
-            plans: dict,
-            configuration: str,
-            fold: int,
-            dataset_json: dict,
-            unpack_dataset: bool = True,
-            device: torch.device = torch.device("cuda"),
-            **kwargs,
+        self,
+        plans: dict,
+        configuration: str,
+        fold: int,
+        dataset_json: dict,
+        unpack_dataset: bool = True,
+        device: torch.device = torch.device("cuda"),
+        **kwargs,
     ):
         super().__init__(
             plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
@@ -106,9 +112,12 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
             weight_decay=self.weight_decay,
         )
 
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(self.dataloader_train),
-                                                               eta_min=0,
-                                                               last_epoch=-1)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=len(self.dataloader_train.data_loader),
+            eta_min=0,
+            last_epoch=-1,
+        )
 
         return optimizer, scheduler
 
@@ -119,19 +128,29 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
 
     @staticmethod
     def get_training_transforms(
-            patch_size: Union[np.ndarray, Tuple[int]],
-            rotation_for_DA: dict,
-            deep_supervision_scales: Union[List, Tuple, None],
-            mirror_axes: Tuple[int, ...],
-            do_dummy_2d_data_aug: bool,
-            order_resampling_data: int = 3,
-            order_resampling_seg: int = 1,
-            border_val_seg: int = -1,
-            use_mask_for_norm: List[bool] = None,
-            is_cascaded: bool = False,
-            foreground_labels: Union[Tuple[int, ...], List[int]] = None,
-            regions: List[Union[List[int], Tuple[int, ...], int]] = None,
-            ignore_label: int = None,
+        patch_size: Union[np.ndarray, Tuple[int]],
+        rotation_for_DA: dict,
+        deep_supervision_scales: Union[List, Tuple, None],
+        mirror_axes: Tuple[int, ...],
+        do_dummy_2d_data_aug: bool,
+        order_resampling_data: int = 3,
+        order_resampling_seg: int = 1,
+        border_val_seg: int = -1,
+        use_mask_for_norm: List[bool] = None,
+        is_cascaded: bool = False,
+        foreground_labels: Union[Tuple[int, ...], List[int]] = None,
+        regions: List[Union[List[int], Tuple[int, ...], int]] = None,
+        ignore_label: int = None,
+    ) -> AbstractTransform:
+        return SimCLRTransform()
+
+    @staticmethod
+    def get_validation_transforms(
+        deep_supervision_scales: Union[List, Tuple, None],
+        is_cascaded: bool = False,
+        foreground_labels: Union[Tuple[int, ...], List[int]] = None,
+        regions: List[Union[List[int], Tuple[int, ...], int]] = None,
+        ignore_label: int = None,
     ) -> AbstractTransform:
         return SimCLRTransform()
 
@@ -140,12 +159,18 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
 
         # load the datasets for training and validation. Note that we always draw random samples so we really don't
         # care about distributing training cases across GPUs.
-        dataset_tr = ContrastiveDataset(self.preprocessed_dataset_folder, tr_keys,
-                                        folder_with_segs_from_previous_stage=self.folder_with_segs_from_previous_stage,
-                                        num_images_properties_loading_threshold=0)
-        dataset_val = ContrastiveDataset(self.preprocessed_dataset_folder, val_keys,
-                                         folder_with_segs_from_previous_stage=self.folder_with_segs_from_previous_stage,
-                                         num_images_properties_loading_threshold=0)
+        dataset_tr = ContrastiveDataset(
+            self.preprocessed_dataset_folder,
+            tr_keys,
+            folder_with_segs_from_previous_stage=self.folder_with_segs_from_previous_stage,
+            num_images_properties_loading_threshold=0,
+        )
+        dataset_val = ContrastiveDataset(
+            self.preprocessed_dataset_folder,
+            val_keys,
+            folder_with_segs_from_previous_stage=self.folder_with_segs_from_previous_stage,
+            num_images_properties_loading_threshold=0,
+        )
         return dataset_tr, dataset_val
 
     def get_plain_dataloaders(self, initial_patch_size: Tuple[int, ...], dim: int):
@@ -154,17 +179,25 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
         assert dim == 3, "Only 3D is supported"
 
         # note that the different arguments are not used in the PCRLv2 data loader
-        dl_tr = nnUNetContrastiveDataLoader(dataset_tr, self.batch_size,
-                                            initial_patch_size,
-                                            self.configuration_manager.patch_size,
-                                            self.label_manager,
-                                            oversample_foreground_percent=self.oversample_foreground_percent,
-                                            sampling_probabilities=None, pad_sides=None)
-        dl_val = nnUNetContrastiveDataLoader(dataset_val, self.batch_size,
-                                             self.configuration_manager.patch_size,
-                                             self.configuration_manager.patch_size,
-                                             self.label_manager,
-                                             oversample_foreground_percent=self.oversample_foreground_percent,
-                                             sampling_probabilities=None, pad_sides=None)
+        dl_tr = nnUNetContrastiveDataLoader(
+            dataset_tr,
+            self.batch_size,
+            initial_patch_size,
+            self.configuration_manager.patch_size,
+            self.label_manager,
+            oversample_foreground_percent=self.oversample_foreground_percent,
+            sampling_probabilities=None,
+            pad_sides=None,
+        )
+        dl_val = nnUNetContrastiveDataLoader(
+            dataset_val,
+            self.batch_size,
+            self.configuration_manager.patch_size,
+            self.configuration_manager.patch_size,
+            self.label_manager,
+            oversample_foreground_percent=self.oversample_foreground_percent,
+            sampling_probabilities=None,
+            pad_sides=None,
+        )
 
         return dl_tr, dl_val

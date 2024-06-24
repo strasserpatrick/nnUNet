@@ -13,17 +13,13 @@ class nnUNetContrastiveDataLoader(nnUNetDataLoaderBase):
         # preallocate memory for data and seg
         global_data = []
         local_data = []
-
-        case_properties = None
+        case_properties = [] 
 
         for i in selected_keys:
             glob, loc, properties = self._data.load_case(i)
             global_data.append(glob)
             local_data.append(loc)
-
-            # properties is same for every case in this implementation
-            if case_properties is None:
-                case_properties = properties
+            case_properties.append(properties)
 
         return {
             "global": np.stack(global_data, axis=0),
