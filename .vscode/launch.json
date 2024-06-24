@@ -1,0 +1,31 @@
+{
+    // Verwendet IntelliSense zum Ermitteln möglicher Attribute.
+    // Zeigen Sie auf vorhandene Attribute, um die zugehörigen Beschreibungen anzuzeigen.
+    // Weitere Informationen finden Sie unter https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Pretraining",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/nnunet/run/run_training_mim.py",
+            "args": [
+                "3d_fullres",
+                "mimTrainer",
+                "300",
+                "all",
+                "-mr",
+                "0.5",
+                "-ms",
+                "2",
+                "-mt",
+                "block_wise"
+            ],
+            "console": "internalConsole",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
