@@ -117,6 +117,7 @@ class nnUNetTrainer(object):
         self.dataset_json = dataset_json
         self.fold = fold
         self.unpack_dataset = unpack_dataset
+        self.unpack_segmentation = True
 
         ### Setting all the folder names. We need to make sure things don't crash in case we are just running
         # inference and some of the folders may not be defined!
@@ -844,7 +845,7 @@ class nnUNetTrainer(object):
         # maybe unpack
         if self.unpack_dataset and self.local_rank == 0:
             self.print_to_log_file('unpacking dataset...')
-            unpack_dataset(self.preprocessed_dataset_folder, unpack_segmentation=True, overwrite_existing=False,
+            unpack_dataset(self.preprocessed_dataset_folder, unpack_segmentation=self.unpack_segmentation, overwrite_existing=False,
                            num_processes=max(1, round(get_allowed_n_proc_DA() // 2)), verify_npy=True)
             self.print_to_log_file('unpacking done...')
 

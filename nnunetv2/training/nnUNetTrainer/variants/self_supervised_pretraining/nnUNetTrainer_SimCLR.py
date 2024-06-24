@@ -26,6 +26,7 @@ from nnunetv2.utilities.helpers import dummy_context
 
 class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
     DEFAULT_PARAMS: dict = {
+        "unpack_segmentation": False,
         "temperature": 0.07,
         "learning_rate": 0.05,
         "weight_decay": 1e-4,
@@ -114,7 +115,7 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
 
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer,
-            T_max=len(self.dataloader_train.data_loader),
+            T_max=len(self.dataloader_train),
             eta_min=0,
             last_epoch=-1,
         )
