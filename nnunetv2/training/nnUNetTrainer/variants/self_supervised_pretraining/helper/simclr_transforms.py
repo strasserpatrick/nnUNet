@@ -34,6 +34,6 @@ class SimCLRTransform(AbstractTransform):
         view_2 = torch.stack([self.contrastive_transforms(inst) for inst in img_2])
 
         return {
-            "view_1": view_1,
-            "view_2": view_2,
+            "data": view_1,
+            "target": view_2,
         }
