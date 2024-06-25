@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import numpy as np
-import torch
 from batchgenerators.transforms.abstract_transforms import AbstractTransform
 from batchgenerators.transforms.utility_transforms import NumpyToTensor
 
@@ -23,13 +22,31 @@ class RBKTransform(AbstractTransform):
     def __call__(self, **data_dict):
 
         # TODO: iterate here over batch dimension, then we can write transform method for each instance
-        transformed_data_dict = self.transform(**data_dict)
-        # TODO: stack somehow into data and target for data loader
-        return NumpyToTensor(keys=["data", "order_label", "hor_label", "ver_label"])(**transformed_data_dict)
+        data = data_dict["data"]
+        batch_size = data.shape[0]
 
-    def transform(self, **data_dict):
+        result_dict = {"data": [], "order_label": [], "hor_label": [], "ver_label": []}
+
+        for b in range(batch_size):
+            d, o, h, v = self.rbk_transform(data[b])
+            result_dict["data"].append(d)
+            result_dict["order_label"].append(o)
+            result_dict["hor_label"].append(h)
+            result_dict["ver_label"].append(v)
+
+        tensor_dict = NumpyToTensor(keys=["data", "order_label", "hor_label", "ver_label"])(**result_dict)
+        return {"data": tensor_dict["data"],
+                "target": {"order_label": tensor_dict["order_label"], "hor_label": tensor_dict["hor_label"],
+                           "ver_label": tensor_dict["ver_label"]}}
+
+    def rbk_transform(self, data):
+        """
+        Transforms the data for the RBK task.
+        :param data: numpy ndarray of shape [C, H, W, D]
+        :return dictionary containing the transformed data with labels
+        """
         # crop the image to the same size
-        cropped_data = self._crop_data(data_dict["data"], crop_size=self.crop_size)
+        cropped_data = self._crop_data(data, crop_size=self.crop_size)
 
         # extract cubes from 3d volume
         all_cubes = self._extract_3d_cubes(cropped_data)
@@ -40,27 +57,30 @@ class RBKTransform(AbstractTransform):
         # task 2: rotate each cube randomly and return one-hot encoded labels
         rearranged_rotated_cubes, hor_label, ver_label = self._rotate_cubes(rearranged_cubes)
 
-        return {
-            "data": rearranged_rotated_cubes,
-            "order_label": order_label,
-            "hor_label": hor_label,
-            "ver_label": ver_label
-        }
+        return (
+            rearranged_rotated_cubes,
+            order_label,
+            hor_label,
+            ver_label,
+        )
 
     @staticmethod
     def _crop_data(data, crop_size):
-        # assume that the data is already centered enough
+        # TODO: do we need a center crop here:
+        # for now e assume that the data is already centered enough
         # => we can crop the data randomly
 
-        x_start = torch.randint(0, data.shape[0] - crop_size[0], (1,))
-        y_start = torch.randint(0, data.shape[1] - crop_size[1], (1,))
-        z_start = torch.randint(0, data.shape[2] - crop_size[2], (1,))
+        _, data_h, data_w, data_d = data.shape
+
+        x_start = np.random.randint(0, data_h - crop_size[0])
+        y_start = np.random.randint(0, data_w - crop_size[1])
+        z_start = np.random.randint(0, data_d - crop_size[2])
 
         x_end = x_start + crop_size[0]
         y_end = y_start + crop_size[1]
         z_end = z_start + crop_size[2]
 
-        return data[x_start:x_end, y_start:y_end, z_start:z_end]
+        return data[:, x_start:x_end, y_start:y_end, z_start:z_end]
 
     def _extract_3d_cubes(self, data):
         """
@@ -68,7 +88,7 @@ class RBKTransform(AbstractTransform):
         :param data: numpy ndarray
         :return: list of numpy ndarray
         """
-        h, w, d = data.shape
+        _, h, w, d = data.shape
 
         patch_overlap = -self.jitter_xy if self.jitter_xy < 0 else 0
 
@@ -85,6 +105,7 @@ class RBKTransform(AbstractTransform):
                 for k in range(self.num_cubes_per_side):
 
                     p = data[
+                        :,
                         i: i + h_grid + patch_overlap,
                         j: j + w_grid + patch_overlap,
                         k: k + d_grid + patch_overlap
@@ -130,13 +151,13 @@ class RBKTransform(AbstractTransform):
             if p < 1 / 3:
                 hor_vector.append(1)
                 ver_vector.append(0)
-                # rotate 180 along x axis
-                rot_cubes[i] = np.flip(cube, (1, 2))
+                # rotate 180 along x-axis
+                rot_cubes[i] = np.flip(cube, (2, 3))
             elif p < 2 / 3:
                 hor_vector.append(0)
                 ver_vector.append(1)
-                # rotate 180 along z axis
-                rot_cubes[i] = np.flip(cube, (0, 1))
+                # rotate 180 along z-axis
+                rot_cubes[i] = np.flip(cube, (1, 2))
 
             else:
                 hor_vector.append(0)

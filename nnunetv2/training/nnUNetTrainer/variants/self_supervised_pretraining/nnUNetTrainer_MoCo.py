@@ -40,7 +40,7 @@ resource: https://github.com/facebookresearch/moco
 """
 
 
-class nnUNetSSLTrainer_MoCo(nnUNetSSLBaseTrainer):
+class nnUNetTrainer_MoCo(nnUNetSSLBaseTrainer):
     DEFAULT_PARAMS: dict = {
         "initial_lr": 0.01,
         "learning_rate_schedule": [120, 160],
