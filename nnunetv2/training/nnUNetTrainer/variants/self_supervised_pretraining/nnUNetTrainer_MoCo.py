@@ -28,7 +28,7 @@ from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper
     ContrastiveLearningViewGenerator,
 )
 from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.ssl_base_trainer import (
-    nnUNetBaseTrainer,
+    nnUNetSSLBaseTrainer,
 )
 from nnunetv2.utilities.helpers import dummy_context
 from nnunetv2.utilities.label_handling.label_handling import (
@@ -40,7 +40,7 @@ resource: https://github.com/facebookresearch/moco
 """
 
 
-class nnUNetTrainer_MoCo(nnUNetBaseTrainer):
+class nnUNetSSLTrainer_MoCo(nnUNetSSLBaseTrainer):
     DEFAULT_PARAMS: dict = {
         "initial_lr": 0.01,
         "learning_rate_schedule": [120, 160],

@@ -11,14 +11,14 @@ from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper
 from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.simclr_transforms import \
     SimCLRTransform
 from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.ssl_base_trainer import \
-    nnUNetBaseTrainer
+    nnUNetSSLBaseTrainer
 
 from batchgenerators.transforms.abstract_transforms import AbstractTransform
 
 from nnunetv2.utilities.helpers import dummy_context
 
 
-class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
+class nnUNetSSLTrainer_SimCLR(nnUNetSSLBaseTrainer):
     DEFAULT_PARAMS: dict = {
         "temperature": 0.07,
         "learning_rate": 0.05,

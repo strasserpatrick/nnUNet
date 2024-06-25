@@ -3,6 +3,7 @@ import torch.nn.functional as F
 
 
 def info_nce_loss(features, batch_size: int, device: torch.device, temperature: float):
+    # TODO: this can be refactored to loss package
 
     n_views = 2
 

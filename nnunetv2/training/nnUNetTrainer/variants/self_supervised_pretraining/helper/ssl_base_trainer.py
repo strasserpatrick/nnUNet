@@ -9,7 +9,7 @@ from batchgenerators.utilities.file_and_folder_operations import join
 from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
 
 
-class nnUNetBaseTrainer(nnUNetTrainer):
+class nnUNetSSLBaseTrainer(nnUNetTrainer):
 
     def __init__(
         self,
@@ -34,7 +34,7 @@ class nnUNetBaseTrainer(nnUNetTrainer):
 
     def _set_hyperparameters(self, **kwargs):
         if not hasattr(self, "DEFAULT_PARAMS"):
-            print("Warning: DEFAULT_PARAMS not set in nnUNetBaseTrainer")
+            print("Warning: DEFAULT_PARAMS not set in nnUNetSSLBaseTrainer")
             return
         for attribute_name in self.DEFAULT_PARAMS:
             if attribute_name in kwargs:
