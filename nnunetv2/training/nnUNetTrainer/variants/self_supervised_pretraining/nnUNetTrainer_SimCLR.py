@@ -1,9 +1,10 @@
-import math
 from typing import List, Tuple, Union
 
 import numpy as np
 import torch
 from torch import autocast
+
+from torch import nn
 
 from nnunetv2.training.dataloading.contrastive_data_loader import (
     nnUNetContrastiveDataLoader,
@@ -51,7 +52,20 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
             plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
         )
 
-        self.projection_layer = None
+        # Encoder feature map to feature vector
+        self.gap = nn.AdaptiveAvgPool2d((1, 1))
+        self.class_projection_layer = None
+
+        # simclr specific head
+        self.projection_layer = (
+            torch.nn.Sequential(
+                torch.nn.Linear(self.latent_space_dim, self.latent_space_dim),
+                torch.nn.ReLU(),
+                torch.nn.Linear(self.latent_space_dim, 256),
+            ).to(self.device)
+            if self.use_projection_layer
+            else None
+        )
 
     def forward(self, data, target):
 
@@ -60,36 +74,22 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
             if self.device.type == "cuda"
             else dummy_context()
         ):
-            # TODO: is this still valid?
-
-            # due to data augmentation, batch dimension has doubled in size
-            # to keep required gpu memory the same, forward pass is done in two passes.
-            data_aug_0, data_aug_1 = torch.chunk(data, 2)
+            data_aug_0 = data
+            data_aug_1 = target
 
             features_0 = self.network(data_aug_0)
+            features_1 = self.network(data_aug_1)
 
-            with torch.no_grad():
-                features_1 = self.network(data_aug_1)
-
-            # plain cnn encoder returns list of all feature maps (len=6 for braTS)
+            # plain cnn encoder can return list of all feature maps (len=6 for braTS)
             # we are only interesting in the final result
             if isinstance(features_0, list):
                 features_0 = features_0[-1]
                 features_1 = features_1[-1]
 
-            features_0 = features_0.flatten(start_dim=1)
-            features_1 = features_1.flatten(start_dim=1)
+            features_0 = self._extract_feature_vector(features_0)
+            features_1 = self._extract_feature_vector(features_1)
 
             if self.use_projection_layer:
-
-                # dynamic initialization depending on encoders output shape
-                if not self.projection_layer:
-                    self.projection_layer = torch.nn.Sequential(
-                        torch.nn.Linear(features_1.shape[1], self.latent_space_dim),
-                        torch.nn.ReLU(),
-                        torch.nn.Linear(self.latent_space_dim, 256),
-                    ).to(self.device)
-
                 features_0 = self.projection_layer(features_0)
                 features_1 = self.projection_layer(features_1)
 
@@ -103,6 +103,17 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
             )
             loss = self.loss(logits, labels)
         return logits, loss
+
+    def _extract_feature_vector(self, feature_map):
+        gap_output = self.gap(feature_map)
+
+        if not self.class_projection_layer:
+            self.class_projection_layer = nn.Linear(
+                gap_output.shape[1], self.latent_space_dim
+            ).to(self.device)
+
+        feature_vector = self.class_projection_layer(gap_output)
+        return feature_vector
 
     # OPTIMIZER, SCHEDULER AND LOSS
 
