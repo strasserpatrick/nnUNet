@@ -40,7 +40,7 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
         self.num_cubes = self.num_cubes_per_side ** 3
 
         # dynamic feature extractor initialization
-        self.gap = nn.AdaptiveAvgPool3d(1)
+        self.gap = nn.AdaptiveAvgPool3d(1).to(self.device)
         self.feature_extractor = None
 
         self.order_fc = nn.Sequential(
@@ -51,21 +51,21 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
             nn.ReLU(inplace=True),
 
             nn.Linear(1024, self.order_n_class)
-        )
+        ).to(self.device)
 
         # module for predicting horizontal rotation (classification task)
         self.ver_rot_fc = nn.Sequential(
             nn.Linear(self.num_cubes * 64, 1024),
             nn.ReLU(inplace=True),
-            nn.Linear(1024, self.num_cubes))
+            nn.Linear(1024, self.num_cubes)).to(self.device)
 
         # module for predicting vertical rotation (classification task)
         self.hor_rot_fc = nn.Sequential(
             nn.Linear(self.num_cubes * 64, 1024),
             nn.ReLU(inplace=True),
-            nn.Linear(1024, self.num_cubes))
+            nn.Linear(1024, self.num_cubes)).to(self.device)
 
-        self.sigmoid = torch.nn.Sigmoid()
+        self.sigmoid = torch.nn.Sigmoid().to(self.device)
 
     def forward(self, data, target):
 
@@ -80,19 +80,20 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
             feature_vectors = self._extract_feature_vectors(data)
 
             order_logits = self.order_fc(feature_vectors)
-            hor_rot_logits = self.sigmoid(self.hor_rot_fc(feature_vectors))
-            ver_rot_logits = self.sigmoid(self.ver_rot_fc(feature_vectors))
+            hor_rot_logits = self.hor_rot_fc(feature_vectors)
+            ver_rot_logits = self.ver_rot_fc(feature_vectors)
 
-            loss = self._compute_rbk_loss(order_logits, hor_rot_logits, ver_rot_logits, target)
-            return loss
+        loss = self._compute_rbk_loss(order_logits, hor_rot_logits, ver_rot_logits, target)
+        return feature_vectors, loss
 
     def _compute_rbk_loss(self, order_logits, hor_rot_logits, ver_rot_logits, target):
-        order_gt, hor_rot_gt, ver_rot_gt = target
         order_loss_fn, rotate_loss_fn = self.loss
 
-        order_loss = order_loss_fn(order_logits, order_gt)
-        rot_loss = rotate_loss_fn(hor_rot_logits, hor_rot_gt) + rotate_loss_fn(
-            ver_rot_logits, ver_rot_gt)
+        order_loss = order_loss_fn(order_logits, target["order_label"])
+
+        hor_rot_loss = rotate_loss_fn(hor_rot_logits, target["hor_label"].to(torch.float16))
+        ver_rot_loss = rotate_loss_fn(ver_rot_logits, target["ver_label"].to(torch.float16))
+        rot_loss = hor_rot_loss + ver_rot_loss
 
         return (order_loss + rot_loss) / 2
 
@@ -100,9 +101,8 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
         feature_vectors = []
         for cube in data:
             conv_x = self.network(cube)
-            dense_x = self.gap(conv_x)
 
-            # TODO: is this necessary?
+            dense_x = self.gap(conv_x)
             dense_x = torch.flatten(dense_x, 1, -1)
 
             if not self.feature_extractor:
@@ -119,7 +119,7 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
             nn.Linear(input_nodes, 64),
             nn.ReLU(inplace=True),
             nn.BatchNorm1d(64)
-        )
+        ).to(self.device)
 
     # OPTIMIZER, SCHEDULER AND LOSS
 
@@ -131,7 +131,7 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
 
     def _build_loss(self):
         order_loss_fn = torch.nn.CrossEntropyLoss(reduction='mean').to(self.device)
-        rotate_loss_fn = nn.BCELoss(reduction='mean').to(self.device)
+        rotate_loss_fn = nn.BCEWithLogitsLoss(reduction='mean').to(self.device)
 
         return order_loss_fn, rotate_loss_fn
 

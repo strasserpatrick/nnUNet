@@ -21,7 +21,6 @@ class RBKTransform(AbstractTransform):
 
     def __call__(self, **data_dict):
 
-        # TODO: iterate here over batch dimension, then we can write transform method for each instance
         data = data_dict["data"]
         batch_size = data.shape[0]
 
@@ -33,6 +32,10 @@ class RBKTransform(AbstractTransform):
             result_dict["order_label"].append(o)
             result_dict["hor_label"].append(h)
             result_dict["ver_label"].append(v)
+
+        # make lists to array -> restore batch dimension
+        for k in ["data", "order_label", "hor_label", "ver_label"]:
+            result_dict[k] = np.stack(result_dict[k], axis=0)
 
         tensor_dict = NumpyToTensor(keys=["data", "order_label", "hor_label", "ver_label"])(**result_dict)
         return {"data": tensor_dict["data"],
