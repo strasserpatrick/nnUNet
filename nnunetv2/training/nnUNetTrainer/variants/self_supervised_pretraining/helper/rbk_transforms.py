@@ -8,7 +8,7 @@ from batchgenerators.transforms.utility_transforms import NumpyToTensor
 helper_dir = Path(__file__).parent
 
 
-class RNKTransform(AbstractTransform):
+class RBKTransform(AbstractTransform):
     def __init__(self, crop_size, num_cubes_per_side=2, jitter_xy=10, jitter_z=5):
         self.crop_size = crop_size
 
