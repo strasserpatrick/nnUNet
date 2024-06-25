@@ -21,20 +21,23 @@ class nnUNetTrainerNoDA(nnUNetTrainer):
                                 foreground_labels: Union[Tuple[int, ...], List[int]] = None,
                                 regions: List[Union[List[int], Tuple[int, ...], int]] = None,
                                 ignore_label: int = None) -> AbstractTransform:
+        # validation transform has minimal transformation
+        # such as cascaded treatment, renaming of target, one-hot conversion
         return nnUNetTrainer.get_validation_transforms(deep_supervision_scales, is_cascaded, foreground_labels,
                                                        regions, ignore_label)
 
     def get_plain_dataloaders(self, initial_patch_size: Tuple[int, ...], dim: int):
+        # we ignore the computed new patch size and set it to the original patch size by configuration
+        # manager
         return super().get_plain_dataloaders(
             initial_patch_size=self.configuration_manager.patch_size,
             dim=dim
         )
 
     def configure_rotation_dummyDA_mirroring_and_inital_patch_size(self):
-        # we need to disable mirroring here so that no mirroring will be applied in inferene!
+        # we need to disable mirroring here so that no mirroring will be applied in inference!
         rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes = \
             super().configure_rotation_dummyDA_mirroring_and_inital_patch_size()
         mirror_axes = None
         self.inference_allowed_mirroring_axes = None
         return rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes
-
