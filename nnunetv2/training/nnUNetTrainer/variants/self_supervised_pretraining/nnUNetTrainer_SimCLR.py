@@ -10,9 +10,7 @@ from nnunetv2.training.dataloading.contrastive_data_loader import (
     nnUNetContrastiveDataLoader,
 )
 from nnunetv2.training.dataloading.contrastive_dataset import ContrastiveDataset
-from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.loss_functions import (
-    info_nce_loss,
-)
+from nnunetv2.training.loss.info_nce import InfoNCELoss
 from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.simclr_transforms import (
     SimCLRTransform,
 )
@@ -39,14 +37,14 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
     }
 
     def __init__(
-        self,
-        plans: dict,
-        configuration: str,
-        fold: int,
-        dataset_json: dict,
-        unpack_dataset: bool = True,
-        device: torch.device = torch.device("cuda"),
-        **kwargs,
+            self,
+            plans: dict,
+            configuration: str,
+            fold: int,
+            dataset_json: dict,
+            unpack_dataset: bool = True,
+            device: torch.device = torch.device("cuda"),
+            **kwargs,
     ):
         super().__init__(
             plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
@@ -65,6 +63,12 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
             ).to(self.device)
             if self.use_projection_layer
             else None
+        )
+
+        self.info_nce_loss = InfoNCELoss(
+            batch_size=self.batch_size,
+            device=self.device,
+            temperature=self.temperature,
         )
 
     def forward(self, data, target):
@@ -95,12 +99,7 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
 
             features = torch.cat((features_0, features_1))
 
-            logits, labels = info_nce_loss(
-                features=features,
-                batch_size=self.batch_size,
-                device=self.device,
-                temperature=self.temperature,
-            )
+            logits, labels = self.info_nce_loss(features=features)
             loss = self.loss(logits, labels)
         return logits, loss
 
@@ -140,29 +139,29 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
 
     @staticmethod
     def get_training_transforms(
-        patch_size: Union[np.ndarray, Tuple[int]],
-        rotation_for_DA: dict,
-        deep_supervision_scales: Union[List, Tuple, None],
-        mirror_axes: Tuple[int, ...],
-        do_dummy_2d_data_aug: bool,
-        order_resampling_data: int = 3,
-        order_resampling_seg: int = 1,
-        border_val_seg: int = -1,
-        use_mask_for_norm: List[bool] = None,
-        is_cascaded: bool = False,
-        foreground_labels: Union[Tuple[int, ...], List[int]] = None,
-        regions: List[Union[List[int], Tuple[int, ...], int]] = None,
-        ignore_label: int = None,
+            patch_size: Union[np.ndarray, Tuple[int]],
+            rotation_for_DA: dict,
+            deep_supervision_scales: Union[List, Tuple, None],
+            mirror_axes: Tuple[int, ...],
+            do_dummy_2d_data_aug: bool,
+            order_resampling_data: int = 3,
+            order_resampling_seg: int = 1,
+            border_val_seg: int = -1,
+            use_mask_for_norm: List[bool] = None,
+            is_cascaded: bool = False,
+            foreground_labels: Union[Tuple[int, ...], List[int]] = None,
+            regions: List[Union[List[int], Tuple[int, ...], int]] = None,
+            ignore_label: int = None,
     ) -> AbstractTransform:
         return SimCLRTransform()
 
     @staticmethod
     def get_validation_transforms(
-        deep_supervision_scales: Union[List, Tuple, None],
-        is_cascaded: bool = False,
-        foreground_labels: Union[Tuple[int, ...], List[int]] = None,
-        regions: List[Union[List[int], Tuple[int, ...], int]] = None,
-        ignore_label: int = None,
+            deep_supervision_scales: Union[List, Tuple, None],
+            is_cascaded: bool = False,
+            foreground_labels: Union[Tuple[int, ...], List[int]] = None,
+            regions: List[Union[List[int], Tuple[int, ...], int]] = None,
+            ignore_label: int = None,
     ) -> AbstractTransform:
         return SimCLRTransform()
 
