@@ -30,7 +30,7 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
         "learning_rate": 0.05,
         "weight_decay": 1e-4,
         "use_projection_layer": True,
-        "latent_space_dim": 512,
+        "latent_space_dim": 256,
         "num_val_iterations_per_epoch": 0,
         "batch_size": 1,
         "num_epochs": 100,
@@ -51,7 +51,7 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
         )
 
         # Encoder feature map to feature vector
-        self.gap = nn.AdaptiveAvgPool2d((1, 1))
+        self.gap = nn.AdaptiveAvgPool3d(1)
         self.class_projection_layer = None
 
         # simclr specific head
@@ -105,13 +105,14 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
 
     def _extract_feature_vector(self, feature_map):
         gap_output = self.gap(feature_map)
+        flattened_gap_output = torch.flatten(gap_output, 1, -1)
 
         if not self.class_projection_layer:
             self.class_projection_layer = nn.Linear(
-                gap_output.shape[1], self.latent_space_dim
+                flattened_gap_output.shape[1], self.latent_space_dim
             ).to(self.device)
 
-        feature_vector = self.class_projection_layer(gap_output)
+        feature_vector = self.class_projection_layer(flattened_gap_output)
         return feature_vector
 
     # OPTIMIZER, SCHEDULER AND LOSS

@@ -20,6 +20,7 @@
                 "nnUNetTrainer_SimCLR",
                 "-p",
                 "nnUNetPreprocessPlansPCRLv2",
+                "--use_compressed",
                 "--foo=bar"
             ]
         },
