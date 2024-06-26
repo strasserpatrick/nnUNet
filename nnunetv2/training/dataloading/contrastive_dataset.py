@@ -11,18 +11,24 @@ class ContrastiveDataset(nnUNetDataset):
 
     def __init__(self, folder: str, case_identifiers: List[str] = None,
                  num_images_properties_loading_threshold: int = 0,
-                 folder_with_segs_from_previous_stage: str = None):
+                 folder_with_segs_from_previous_stage: str = None,
+                 global_only=False):
 
         super().__init__(folder, case_identifiers, num_images_properties_loading_threshold,
                          folder_with_segs_from_previous_stage)
+
+        self.global_only = global_only
+
         case_identifiers = self._load_case_identifiers(folder)
 
         self.dataset = {}
         for c in case_identifiers:
             self.dataset[c] = {}
             self.dataset[c]['global_view_file'] = join(folder, f"{c}.npz")
-            local_cid = c.replace("global", "local")
-            self.dataset[c]['local_view_file'] = join(folder, f"{local_cid}.npz")
+
+            if not self.global_only:
+                local_cid = c.replace("global", "local")
+                self.dataset[c]['local_view_file'] = join(folder, f"{local_cid}.npz")
             properties_cid = "_".join(c.split("_")[:-2])
             self.dataset[c]['properties_file'] = join(folder, f"{properties_cid}.pkl")
             if folder_with_segs_from_previous_stage is not None:
@@ -42,7 +48,7 @@ class ContrastiveDataset(nnUNetDataset):
             if fn.endswith(".npz") and (fn.find("segFromPrevStage") == -1) and (fn.find("global") != -1):
                 cid = fn[:-4]
                 case_identifiers.append(cid)
-        return case_identifiers 
+        return case_identifiers
 
     def load_case(self, key):
         # we load global as data and local as seg to keep the flow
@@ -54,11 +60,14 @@ class ContrastiveDataset(nnUNetDataset):
             if self.keep_files_open:
                 self.dataset[key]['open_data_file'] = global_data
 
+        if self.global_only:
+            return global_data, None, entry["properties"]
+
         if 'open_seg_file' in entry.keys():
             local_data = entry['open_seg_file']
         else:
             local_data = np.load(entry["local_view_file"], 'r')['data']
             if self.keep_files_open:
                 self.dataset[key]['open_seg_file'] = local_data
-             
+
         return global_data, local_data, entry["properties"]

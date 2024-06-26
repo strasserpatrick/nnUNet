@@ -175,12 +175,14 @@ class nnUNetTrainer_SimCLR(nnUNetBaseTrainer):
             tr_keys,
             folder_with_segs_from_previous_stage=self.folder_with_segs_from_previous_stage,
             num_images_properties_loading_threshold=0,
+            global_only=True
         )
         dataset_val = ContrastiveDataset(
             self.preprocessed_dataset_folder,
             val_keys,
             folder_with_segs_from_previous_stage=self.folder_with_segs_from_previous_stage,
             num_images_properties_loading_threshold=0,
+            global_only=True
         )
         return dataset_tr, dataset_val
 
