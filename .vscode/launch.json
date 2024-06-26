@@ -19,7 +19,9 @@
                 "-ms",
                 "2",
                 "-mt",
-                "block_wise"
+                "block_wise",
+                "--synthesize",
+                
             ],
             "console": "internalConsole",
             "env": {

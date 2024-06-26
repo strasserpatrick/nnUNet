@@ -88,7 +88,7 @@ def main():
     parser.add_argument("-mr", help="mask_ratio", default=float)
     parser.add_argument("-mt", help="mask_type", default=None)
     parser.add_argument("-ms", help="mask_size", type=int)
-    parser.add_argument("--synthesize", default=True)
+    parser.add_argument("--synthesize", action="store_true", default=False)
     parser.add_argument("--lt", default=True, help='loss type, predict or reconstruct')
 
     args = parser.parse_args()
