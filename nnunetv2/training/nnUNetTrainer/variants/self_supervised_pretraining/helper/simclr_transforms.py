@@ -24,7 +24,11 @@ class SimCLRTransform(AbstractTransform):
     def __call__(self, **data_dict):
         # we can only convert if target (local) cubes are loaded
         # this interferes with ContrastiveDataset's option global_only
-        keys = ['global', 'local'] if "local" in data_dict.keys() else ['global']
+        keys = (
+            ["global", "local"]
+            if "local" in data_dict.keys() and data_dict["local"][0] is not None
+            else ["global"]
+        )
         converted_data_dict = NumpyToTensor(keys=keys)(**data_dict)
         return self.transform(**converted_data_dict)
 
