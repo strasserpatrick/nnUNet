@@ -12,10 +12,9 @@ from batchgenerators.transforms.noise_transforms import (
     GaussianNoiseTransform,
     GaussianBlurTransform,
 )
-from batchgenerators.transforms.crop_and_pad_transforms import RandomCropTransform
 from batchgenerators.transforms.resample_transforms import SimulateLowResolutionTransform
-from batchgenerators.transforms.utility_transforms import NumpyToTensor, RemoveLabelTransform
 from batchgenerators.transforms.spatial_transforms import MirrorTransform, SpatialTransform
+from batchgenerators.transforms.utility_transforms import NumpyToTensor, RemoveLabelTransform
 from torch import autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim.lr_scheduler import LambdaLR
