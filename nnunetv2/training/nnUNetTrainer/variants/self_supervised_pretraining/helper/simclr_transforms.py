@@ -11,15 +11,21 @@ from torchio.transforms import (
 
 class SimCLRTransform(AbstractTransform):
     def __init__(self):
-        self.contrastive_transforms = Compose([
-            RandomFlip(),
-            RandomAffine(scales=(0.8, 1.2, 0.8, 1.2, 1, 1),
-                         degrees=(-10, 10, -10, 10, 0, 0)),
-            RandomBlur()
-        ])
+        self.contrastive_transforms = Compose(
+            [
+                RandomFlip(),
+                RandomAffine(
+                    scales=(0.8, 1.2, 0.8, 1.2, 1, 1), degrees=(-10, 10, -10, 10, 0, 0)
+                ),
+                RandomBlur(),
+            ]
+        )
 
     def __call__(self, **data_dict):
-        converted_data_dict = NumpyToTensor(keys=["global", "local"])(**data_dict)
+        # we can only convert if target (local) cubes are loaded
+        # this interferes with ContrastiveDataset's option global_only
+        keys = ["global"] if data_dict["target"][0] is None else ["global", "local"]
+        converted_data_dict = NumpyToTensor(keys=keys)(**data_dict)
         return self.transform(**converted_data_dict)
 
     def transform(self, **data_dict):

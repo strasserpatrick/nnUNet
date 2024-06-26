@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python-Debugger run_training PCRLv2",
+            "name": "SimCLR",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/nnunetv2/run/run_training.py",
@@ -20,7 +20,6 @@
                 "nnUNetTrainer_SimCLR",
                 "-p",
                 "nnUNetPreprocessPlansPCRLv2",
-                "--use_compressed",
                 "--foo=bar"
             ]
         },
