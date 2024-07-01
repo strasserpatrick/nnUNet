@@ -15,7 +15,7 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
     DEFAULT_PARAMS: dict = {
         "num_val_iterations_per_epoch": 0,
         "num_epochs": 100,
-        "feature_dimension": 64,
+        "feature_dimension": 256,
         "order_n_class": 100,  # permutations have hemming distance of 100 -> 100 classes
         "num_cubes_per_side": 2,
         "learning_rate": 1e-4,
@@ -44,7 +44,7 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
         self.feature_extractor = None
 
         self.order_fc = nn.Sequential(
-            nn.Linear(self.num_cubes * 64, 1024),
+            nn.Linear(self.num_cubes * self.feature_dimension, 1024),
             nn.ReLU(inplace=True),
 
             nn.Linear(1024, 1024),
@@ -55,13 +55,13 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
 
         # module for predicting horizontal rotation (classification task)
         self.ver_rot_fc = nn.Sequential(
-            nn.Linear(self.num_cubes * 64, 1024),
+            nn.Linear(self.num_cubes * self.feature_dimension, 1024),
             nn.ReLU(inplace=True),
             nn.Linear(1024, self.num_cubes)).to(self.device)
 
         # module for predicting vertical rotation (classification task)
         self.hor_rot_fc = nn.Sequential(
-            nn.Linear(self.num_cubes * 64, 1024),
+            nn.Linear(self.num_cubes * self.feature_dimension, 1024),
             nn.ReLU(inplace=True),
             nn.Linear(1024, self.num_cubes)).to(self.device)
 
@@ -116,9 +116,9 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
 
     def _initialize_feature_extractor(self, input_nodes):
         self.feature_extractor = nn.Sequential(
-            nn.Linear(input_nodes, 64),
+            nn.Linear(input_nodes, self.feature_dimension),
             nn.ReLU(inplace=True),
-            nn.BatchNorm1d(64)
+            nn.BatchNorm1d(self.feature_dimension)
         ).to(self.device)
 
     # OPTIMIZER, SCHEDULER AND LOSS
