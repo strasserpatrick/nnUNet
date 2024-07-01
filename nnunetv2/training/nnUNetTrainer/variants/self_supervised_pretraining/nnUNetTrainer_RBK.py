@@ -18,7 +18,7 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
         "feature_dimension": 64,
         "order_n_class": 100,  # permutations have hemming distance of 100 -> 100 classes
         "num_cubes_per_side": 2,
-        "learning_rate": 1e-3,
+        "learning_rate": 1e-4,
         "learning_rate_decay": [250],
         "weight_decay": 1e-6,
     }
