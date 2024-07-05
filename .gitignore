@@ -111,6 +111,6 @@ ENV/
 *.jpg
 *.jpeg
 .DS_Store
-
 *.model
-
+!documentation/assets/scribble_example.png
+.venv
