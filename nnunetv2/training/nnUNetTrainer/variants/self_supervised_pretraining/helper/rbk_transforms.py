@@ -68,16 +68,17 @@ class RBKTransform(AbstractTransform):
         )
 
     @staticmethod
-    def _crop_data(data, crop_size):
-        # TODO: do we need a center crop here:
-        # for now e assume that the data is already centered enough
-        # => we can crop the data randomly
-
+    def _crop_data(data, crop_size, center_crop=True):
         _, data_h, data_w, data_d = data.shape
 
-        x_start = np.random.randint(0, data_h - crop_size[0])
-        y_start = np.random.randint(0, data_w - crop_size[1])
-        z_start = np.random.randint(0, data_d - crop_size[2])
+        if center_crop:
+            x_start = (data_h - crop_size[0]) // 2
+            y_start = (data_w - crop_size[1]) // 2
+            z_start = (data_d - crop_size[2]) // 2
+        else:
+            x_start = np.random.randint(0, data_h - crop_size[0])
+            y_start = np.random.randint(0, data_w - crop_size[1])
+            z_start = np.random.randint(0, data_d - crop_size[2])
 
         x_end = x_start + crop_size[0]
         y_end = y_start + crop_size[1]
