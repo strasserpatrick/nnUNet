@@ -950,7 +950,7 @@ class MimTrainer(NetworkTrainer):
                 data = data.unsqueeze(0)
 
                 if self.synthesize is not None:
-                    data = synthesize_input(data, self.mask_size, self.mask_ratio)
+                    data = synthesize_input(data, self.mask_size[0], self.mask_ratio)
                 else:
                     data = data
 
