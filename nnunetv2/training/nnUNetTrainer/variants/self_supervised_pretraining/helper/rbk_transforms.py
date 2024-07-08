@@ -108,11 +108,15 @@ class RBKTransform(AbstractTransform):
             for j in range(self.num_cubes_per_side):
                 for k in range(self.num_cubes_per_side):
 
+                    start_h = i * h_grid
+                    start_w = j * w_grid
+                    start_d = k * d_grid
+
                     p = data[
                         :,
-                        i: i + h_grid + patch_overlap,
-                        j: j + w_grid + patch_overlap,
-                        k: k + d_grid + patch_overlap
+                        start_h:start_h + h_grid + patch_overlap,
+                        start_w:start_w + w_grid + patch_overlap,
+                        start_d:start_d + d_grid + patch_overlap
                         ]
 
                     # crop the patch if the patch is smaller than the grid
