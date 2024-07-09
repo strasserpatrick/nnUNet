@@ -17,7 +17,7 @@ class RBKTransform(AbstractTransform):
         self.jitter_xy = jitter_xy
         self.jitter_z = jitter_z
 
-        self.k_permutations = np.load(str(helper_dir / "k_permutations.npy"))
+        self.k_permutations = np.load(str(helper_dir / "k_permutations10.npy"))
 
     def __call__(self, **data_dict):
 
