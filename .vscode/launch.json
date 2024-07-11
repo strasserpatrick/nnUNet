@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python-Debugger run_training",
+            "name": "Train Distributed",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/nnunetv2/run/run_training.py",
@@ -15,6 +15,10 @@
                 "300",
                 "3d_fullres",
                 "all",
+                "-num_gpus",
+                "2",
+                "-p",
+                "nnUNetPlans43"
             ]
         }
     ]

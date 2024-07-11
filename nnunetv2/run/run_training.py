@@ -110,8 +110,7 @@ def cleanup_ddp():
 
 
 def run_ddp(rank, dataset_name_or_id, configuration, fold, tr, p, use_compressed, disable_checkpointing,
-            c, val,
-            pretrained_weights, npz, val_with_best, world_size, **kwargs):
+            c, val, pretrained_weights, npz, val_with_best, world_size, **kwargs):
     setup_ddp(rank, world_size)
     torch.cuda.set_device(torch.device('cuda', dist.get_rank()))
 
@@ -180,6 +179,9 @@ def run_training(dataset_name_or_id: Union[str, int],
             print(f"using port {port}")
             os.environ['MASTER_PORT'] = port  # str(port)
 
+        # TODO: this needs refactoring as we cannot pass kwargs in mp
+        # https://github.com/pytorch/pytorch/issues/73902
+
         mp.spawn(run_ddp,
                  args=(
                      dataset_name_or_id,
@@ -195,7 +197,7 @@ def run_training(dataset_name_or_id: Union[str, int],
                      export_validation_probabilities,
                      val_with_best,
                      num_gpus,
-                     kwargs),
+                     ),
                  nprocs=num_gpus,
                  join=True)
     else:
