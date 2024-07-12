@@ -133,13 +133,11 @@ class nnUNetTrainer_MoCo(nnUNetSSLBaseTrainer):
                 )
                 self.network = DDP(self.network, device_ids=[self.local_rank])
 
+                # momentum encoder network does not need DDP, as no gradients are computed
                 self.momentum_encoder_network = (
                     torch.nn.SyncBatchNorm.convert_sync_batchnorm(
                         self.momentum_encoder_network
                     )
-                )
-                self.momentum_encoder_network = DDP(
-                    self.momentum_encoder_network, device_ids=[self.local_rank]
                 )
 
             self.loss = self._build_loss()
