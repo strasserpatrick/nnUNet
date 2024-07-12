@@ -14,7 +14,7 @@ from nnunetv2.utilities.helpers import dummy_context
 class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
     DEFAULT_PARAMS: dict = {
         "num_val_iterations_per_epoch": 0,
-        "num_epochs": 100,
+        "num_epochs": 1000,
         "batch_size": 8,
         "feature_dimension": 64,
         "order_n_class": 10,  # we need as many classes as total permutations to guess from
