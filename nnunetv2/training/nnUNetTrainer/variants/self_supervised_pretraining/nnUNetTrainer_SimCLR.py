@@ -31,7 +31,7 @@ class nnUNetTrainer_SimCLR(nnUNetSSLBaseTrainer):
         "use_projection_layer": True,
         "latent_space_dim": 8096,
         "num_val_iterations_per_epoch": 0,
-        "batch_size": 8,
+        "batch_size": 16,
         "num_epochs": 5000,
     }
 

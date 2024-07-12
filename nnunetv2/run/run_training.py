@@ -280,7 +280,6 @@ def run_training(
                 export_validation_probabilities,
                 val_with_best,
                 num_gpus,
-                kwargs,
             ),
             nprocs=num_gpus,
             join=True,
