@@ -18,7 +18,7 @@ from batchgenerators.transforms.abstract_transforms import AbstractTransform
 from nnunetv2.utilities.helpers import dummy_context
 
 
-class nnUNetTrainer_SimCLR(nnUNetSSLBaseTrainer):
+class nnUNetTrainer_MedicalSimCLR(nnUNetSSLBaseTrainer):
     DEFAULT_PARAMS: dict = {
         "temperature": 0.07,
         "learning_rate": 0.05,
