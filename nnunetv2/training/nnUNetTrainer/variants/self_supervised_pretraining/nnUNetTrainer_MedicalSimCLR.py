@@ -8,8 +8,8 @@ from torch import autocast
 from nnunetv2.training.dataloading.contrastive_data_loader import nnUNetContrastiveDataLoader
 from nnunetv2.training.dataloading.contrastive_dataset import ContrastiveDataset
 from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.loss_functions import info_nce_loss
-from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.simclr_transforms import \
-    SimCLRTransform
+from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.medical_simclr_transforms import \
+    MedicalSimCLRTransform
 from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.ssl_base_trainer import \
     nnUNetSSLBaseTrainer
 
@@ -133,7 +133,7 @@ class nnUNetTrainer_MedicalSimCLR(nnUNetSSLBaseTrainer):
             regions: List[Union[List[int], Tuple[int, ...], int]] = None,
             ignore_label: int = None,
     ) -> AbstractTransform:
-        return SimCLRTransform()
+        return MedicalSimCLRTransform()
 
     def get_tr_and_val_datasets(self):
         tr_keys, val_keys = self.do_split()
