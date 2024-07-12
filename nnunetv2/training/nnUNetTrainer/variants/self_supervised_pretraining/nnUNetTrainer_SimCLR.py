@@ -31,7 +31,7 @@ class nnUNetTrainer_SimCLR(nnUNetSSLBaseTrainer):
         "use_projection_layer": True,
         "latent_space_dim": 8096,
         "num_val_iterations_per_epoch": 0,
-        "batch_size": 16,
+        "batch_size": 8,
         "num_epochs": 5000,
     }
 
@@ -61,7 +61,6 @@ class nnUNetTrainer_SimCLR(nnUNetSSLBaseTrainer):
             optimizer, T_max=len(self.dataloader_train), eta_min=0, last_epoch=-1
         )
 
-        scheduler = None
         return optimizer, scheduler
 
     def _build_loss(self):
