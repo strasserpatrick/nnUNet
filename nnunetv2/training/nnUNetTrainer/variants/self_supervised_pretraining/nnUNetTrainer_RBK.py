@@ -15,10 +15,11 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
     DEFAULT_PARAMS: dict = {
         "num_val_iterations_per_epoch": 0,
         "num_epochs": 100,
-        "feature_dimension": 256,
-        "order_n_class": 10,  # permutations have hemming distance of 100 -> 100 classes
+        "batch_size": 8,
+        "feature_dimension": 64,
+        "order_n_class": 10,  # we need as many classes as total permutations to guess from
         "num_cubes_per_side": 2,
-        "learning_rate": 1e-2,
+        "learning_rate": 1e-3,
         "learning_rate_decay": [250],
         "weight_decay": 1e-6,
     }
@@ -46,10 +47,8 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
         self.order_fc = nn.Sequential(
             nn.Linear(self.num_cubes * self.feature_dimension, 1024),
             nn.ReLU(inplace=True),
-
             nn.Linear(1024, 1024),
             nn.ReLU(inplace=True),
-
             nn.Linear(1024, self.order_n_class)
         ).to(self.device)
 
@@ -97,9 +96,9 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
 
         return (order_loss + rot_loss) / 2
 
-    def _extract_feature_vectors(self, data):
+    def _extract_feature_vectors(self, cubes):
         feature_vectors = []
-        for cube in data:
+        for cube in cubes:
             conv_x = self.network(cube)
 
             dense_x = self.gap(conv_x)
