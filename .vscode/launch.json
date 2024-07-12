@@ -25,7 +25,7 @@
             "console": "internalConsole"
         },
         {
-            "name": "Python-Debugger run_training SimCLR",
+            "name": "SimCLR",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/nnunetv2/run/run_training.py",
@@ -39,8 +39,7 @@
                 "-tr",
                 "nnUNetTrainer_SimCLR",
                 "-p",
-                "nnUNetPlans_simclr",
-                "--foo=bar"
+                "nnUNetPlans43",
             ]
         }
     ]

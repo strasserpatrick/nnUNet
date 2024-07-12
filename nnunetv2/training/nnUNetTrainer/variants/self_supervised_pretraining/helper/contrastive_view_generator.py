@@ -28,9 +28,7 @@ class ContrastiveLearningViewGenerator(AbstractTransform):
             transformed_volumes.append(torch.stack(crops, dim=0))
 
         result_dict = {'target': None, 'data': torch.stack(transformed_volumes, dim=0)}
-        # batch + augmentations, modality, w, h, d
-        # loss will take care of this
-        result_dict['data'] = torch.cat(result_dict['data'], dim=0)
+        # batch, augmentation views, channels , w, h, d
 
         return result_dict
 

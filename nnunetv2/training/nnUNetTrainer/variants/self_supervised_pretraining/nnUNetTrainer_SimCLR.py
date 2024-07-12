@@ -76,13 +76,14 @@ class nnUNetTrainer_SimCLR(nnUNetSSLBaseTrainer):
         ):
             # due to data augmentation, batch dimension has doubled in size
             # to keep required gpu memory the same, forward pass is done in two passes.
-            data_aug_0, data_aug_1 = torch.chunk(data, 2)
+            view0 = data[:, 0]
+            view1 = data[:, 1]
 
-            features_0 = self.network(data_aug_0)
+            features_0 = self.network(view0)
 
             # TODO: is this really no grad?
             with torch.no_grad():
-                features_1 = self.network(data_aug_1)
+                features_1 = self.network(view1)
 
             # plain cnn encoder returns list of all feature maps (len=6 for braTS)
             # we are only interesting in the final result
