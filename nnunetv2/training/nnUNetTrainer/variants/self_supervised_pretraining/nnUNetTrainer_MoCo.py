@@ -123,6 +123,8 @@ class nnUNetTrainer_MoCo(nnUNetSSLBaseTrainer):
                     )
                 )
 
+                self.query_projection_layer = DDP(self.query_projection_layer, device_ids=[self.local_rank])
+
             self.loss = self._build_loss()
             self.was_initialized = True
         else:

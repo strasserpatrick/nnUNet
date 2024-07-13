@@ -107,6 +107,11 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
                 )
                 self.network = DDP(self.network, device_ids=[self.local_rank])
 
+                self.feature_extractor = DDP(self.feature_extractor, device_ids=[self.local_rank])
+                self.order_fc = DDP(self.order_fc, device_ids=[self.local_rank])
+                self.ver_rot_fc = DDP(self.ver_rot_fc, device_ids=[self.local_rank])
+                self.hor_rot_fc = DDP(self.hor_rot_fc, device_ids=[self.local_rank])
+
             self.loss = self._build_loss()
             self.was_initialized = True
         else:

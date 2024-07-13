@@ -15,6 +15,10 @@ from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper
     nnUNetSSLBaseTrainer,
 )
 from nnunetv2.utilities.helpers import dummy_context
+from nnunetv2.utilities.label_handling.label_handling import determine_num_input_channels
+
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 
 """
 Resources:
@@ -32,7 +36,7 @@ class nnUNetTrainer_SimCLR(nnUNetSSLBaseTrainer):
         "latent_space_dim": 8096,
         "num_val_iterations_per_epoch": 0,
         "batch_size": 8,
-        "num_epochs": 5000,
+        "num_epochs": 100,
     }
 
     def __init__(
@@ -50,6 +54,41 @@ class nnUNetTrainer_SimCLR(nnUNetSSLBaseTrainer):
         )
 
         self.projection_layer = None
+
+    def initialize(self):
+        if not self.was_initialized:
+            self.num_input_channels = determine_num_input_channels(self.plans_manager, self.configuration_manager,
+                                                                   self.dataset_json)
+
+            self.network = self.build_network_architecture(
+                self.configuration_manager.network_arch_class_name,
+                self.configuration_manager.network_arch_init_kwargs,
+                self.configuration_manager.network_arch_init_kwargs_req_import,
+                self.num_input_channels,
+                self.label_manager.num_segmentation_heads,
+                self.enable_deep_supervision
+            ).to(self.device)
+
+            num_dims = self._determine_out_dimensionality()
+            self._initialize_projection_layer(num_dims)
+
+            # compile network for free speedup
+            if self._do_i_compile():
+                self.print_to_log_file('Using torch.compile...')
+                self.network = torch.compile(self.network)
+
+            self.optimizer, self.lr_scheduler = self.configure_optimizers()
+            # if ddp, wrap in DDP wrapper
+            if self.is_ddp:
+                self.network = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.network)
+                self.network = DDP(self.network, device_ids=[self.local_rank])
+                self.projection_layer = DDP(self.projection_layer, device_ids=[self.local_rank])
+
+            self.loss = self._build_loss()
+            self.was_initialized = True
+        else:
+            raise RuntimeError("You have called self.initialize even though the trainer was already initialized. "
+                               "That should not happen.")
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
@@ -73,29 +112,20 @@ class nnUNetTrainer_SimCLR(nnUNetSSLBaseTrainer):
             if self.device.type == "cuda"
             else dummy_context()
         ):
-            # due to data augmentation, batch dimension has doubled in size
-            # to keep required gpu memory the same, forward pass is done in two passes.
-            view0 = data[:, 0]
-            view1 = data[:, 1]
-
-            features_0 = self.network(view0)
-
-            # TODO: is this really no grad?
-            with torch.no_grad():
-                features_1 = self.network(view1)
+            # we have input of form (batch_size, augmentation_views, c, x, y, z)
+            # first we flatten the augmentation views into the batch dimension
+            combined_data = data.view(-1, *data.shape[2:])
+            features = self.network(combined_data)
 
             # plain cnn encoder returns list of all feature maps (len=6 for braTS)
-            # we are only interesting in the final result
-            if isinstance(features_0, list):
-                features_0 = features_0[-1]
-                features_1 = features_1[-1]
+            # we are only interested in the final result
+            if isinstance(features, list):
+                features = features[-1]
 
-            features_0 = features_0.flatten(start_dim=1)
-            features_1 = features_1.flatten(start_dim=1)
+            flattened_features = torch.flatten(self.gap(features), 1, -1)
 
-            projected_features_0, projected_features_1 = self._project_features(features_0, features_1)
-
-            projected_features = torch.cat((projected_features_0, projected_features_1))
+            # this only has effect if you use_projection_layer is True
+            projected_features = self.projection_layer(flattened_features)
 
             logits, labels = info_nce_loss(
                 features=projected_features,
@@ -108,20 +138,18 @@ class nnUNetTrainer_SimCLR(nnUNetSSLBaseTrainer):
 
     def _project_features(self, features_0, features_1):
         if self.use_projection_layer:
-
-            # dynamic initialization depending on encoders output shape
-            if not self.projection_layer:
-                self.projection_layer = torch.nn.Sequential(
-                    torch.nn.Linear(features_1.shape[1], self.latent_space_dim),
-                    torch.nn.ReLU(),
-                    torch.nn.Linear(self.latent_space_dim, self.latent_space_dim),
-                    torch.nn.ReLU(),
-                ).to(self.device)
-
             features_0 = self.projection_layer(features_0)
             features_1 = self.projection_layer(features_1)
 
         return features_0, features_1
+
+    def _initialize_projection_layer(self, in_dimension):
+        self.projection_layer = torch.nn.Sequential(
+            torch.nn.Linear(in_dimension, self.latent_space_dim),
+            torch.nn.ReLU(),
+            torch.nn.Linear(self.latent_space_dim, self.latent_space_dim),
+            torch.nn.ReLU(),
+        ).to(self.device)
 
     @staticmethod
     def get_training_transforms(
