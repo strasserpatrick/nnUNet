@@ -166,6 +166,14 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
         ):
             view1, view2 = data[:, 0], data[:, 1]
 
+            if view1.ndim != 5 or view1.shape[1] != 4:
+                print("wtf view1")
+                print(view1.shape)
+
+            if view2.ndim != 5 or view2.shape[1] != 4:
+                print("wtf view2")
+                print(view2.shape)
+
             self._momentum_update_key_encoder()
 
             # first view
