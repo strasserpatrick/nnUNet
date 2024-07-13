@@ -83,15 +83,10 @@ class nnUNetTrainer_MoCo(nnUNetSSLBaseTrainer):
                 self.enable_deep_supervision,
             ).to(self.device)
 
-            self.print_to_log_file("Cloning weights of encoder to momentum encoder")
-            for param_q, param_k in tqdm(
-                    zip(
-                        self.network.parameters(),
-                        self.momentum_encoder_network.parameters(),
-                    )
-            ):
-                param_k.data.copy_(param_q.data)  # initialize
-                param_k.requires_grad = False  # not update by gradient
+            num_dims = self._determine_out_dimensionality()
+            self._initialize_projection_layers(num_dims)
+
+            self._initialze_models_same_weights()
 
             self.momentum_encoder_network.register_buffer(
                 "queue", torch.randn(self.projection_layer_dimension, self.queue_size)
@@ -140,8 +135,9 @@ class nnUNetTrainer_MoCo(nnUNetSSLBaseTrainer):
         return torch.nn.CrossEntropyLoss().to(self.device)
 
     def configure_optimizers(self):
+        all_params = list(self.network.parameters()) + list(self.query_projection_layer.parameters())
         optimizer = torch.optim.SGD(
-            self.network.parameters(),
+            all_params,
             lr=self.initial_lr,
             weight_decay=self.weight_decay,
             momentum=self.optimizer_momentum
@@ -205,12 +201,32 @@ class nnUNetTrainer_MoCo(nnUNetSSLBaseTrainer):
             loss = self.loss(logits, labels)
         return logits, loss
 
+    def _initialze_models_same_weights(self):
+
+        self.print_to_log_file("Cloning weights of encoder to momentum encoder")
+        for param_q, param_k in tqdm(
+                zip(
+                    self.network.parameters(),
+                    self.momentum_encoder_network.parameters(),
+                )
+        ):
+            param_k.data.copy_(param_q.data)  # initialize
+            param_k.requires_grad = False  # not update by gradient
+
+        for param_q, param_k in tqdm(
+                zip(
+                    self.query_projection_layer.parameters(),
+                    self.key_projection_layer.parameters(),
+                )
+        ):
+            param_k.data.copy_(param_q.data)
+            param_k.requires_grad = False
+
     @torch.no_grad()
     def key_forward(self, key_data):
         self._momentum_update_key_encoder()
 
         if self.is_ddp:
-            # TODO: this is not tested
             key_data, idx_unshuffle = self._batch_shuffle_ddp(key_data)
             k = self.momentum_encoder_network(key_data)
 
@@ -218,10 +234,7 @@ class nnUNetTrainer_MoCo(nnUNetSSLBaseTrainer):
                 k = k[-1]
             k = k.flatten(start_dim=1)
 
-            if not self.key_projection_layer:
-                self.initialize_projection_layers(k.shape[1])
             k = self.key_projection_layer(k)
-
             k = F.normalize(k, dim=1)
 
             # undo shuffle
@@ -233,10 +246,7 @@ class nnUNetTrainer_MoCo(nnUNetSSLBaseTrainer):
                 k = k[-1]
             k = k.flatten(start_dim=1)
 
-            if not self.key_projection_layer:
-                self.initialize_projection_layers(k.shape[1])
             k = self.key_projection_layer(k)
-
             k = F.normalize(k, dim=1)
 
         return k
@@ -248,31 +258,27 @@ class nnUNetTrainer_MoCo(nnUNetSSLBaseTrainer):
             q = q[-1]
         q = q.flatten(start_dim=1)
 
-        if not self.query_projection_layer:
-            self.initialize_projection_layers(q.shape[1])
         q = self.query_projection_layer(q)
-
         q = F.normalize(q, dim=1)
         return q
 
-    def initialize_projection_layers(self, in_dimension):
-        if not self.query_projection_layer:
-            self.query_projection_layer = torch.nn.Linear(
-                in_dimension, self.projection_layer_dimension
-            ).to(self.device)
+    def _initialize_projection_layers(self, in_dimension):
+        self.query_projection_layer = torch.nn.Linear(
+            in_dimension, self.projection_layer_dimension
+        ).to(self.device)
 
-            self.key_projection_layer = torch.nn.Linear(
-                in_dimension, self.projection_layer_dimension
-            ).to(self.device)
+        self.key_projection_layer = torch.nn.Linear(
+            in_dimension, self.projection_layer_dimension
+        ).to(self.device)
 
-            for param_q, param_k in tqdm(
-                    zip(
-                        self.query_projection_layer.parameters(),
-                        self.key_projection_layer.parameters(),
-                    )
-            ):
-                param_k.data.copy_(param_q.data)  # initialize
-                param_k.requires_grad = False  # not update by gradient
+        for param_q, param_k in tqdm(
+                zip(
+                    self.query_projection_layer.parameters(),
+                    self.key_projection_layer.parameters(),
+                )
+        ):
+            param_k.data.copy_(param_q.data)  # initialize
+            param_k.requires_grad = False  # not update by gradient
 
     @staticmethod
     def get_training_transforms(
