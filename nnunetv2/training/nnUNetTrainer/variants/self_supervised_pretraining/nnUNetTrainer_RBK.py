@@ -123,7 +123,10 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
     # OPTIMIZER, SCHEDULER AND LOSS
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.network.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
+        all_parameters = list(self.network.parameters()) + list(self.order_fc.parameters()) + list(
+            self.ver_rot_fc.parameters()) + list(self.hor_rot_fc.parameters())
+
+        optimizer = torch.optim.Adam(all_parameters, lr=self.learning_rate, weight_decay=self.weight_decay)
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, self.learning_rate_decay)
 
         return optimizer, scheduler
