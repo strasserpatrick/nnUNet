@@ -8,6 +8,8 @@ from torch import autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
 from tqdm import tqdm
 
+from torchio import RandomFlip, RandomAffine, RandomBlur, Compose, RandomNoise
+
 from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.contrastive_view_generator import (
     ContrastiveLearningViewGenerator,
 )
@@ -25,7 +27,7 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
         "learning_rate": 1e-4,
         "sgd_momentum": 0.9,
         "weight_decay": 1e-4,
-        "hidden_dim": 4096,  # TODO: this is probably too high?
+        "hidden_dim": 1024,
         "pred_dim": 256,
         "momentum": 0.996,
     }
@@ -50,10 +52,11 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
         # query encoder is online network -> projection layer -> prediction layer
         self.query_projection_layer = None
         # no_grad is set when we momentum update the key encoder
-        self.query_prediction_layer = torch.nn.Sequential(torch.nn.Linear(self.pred_dim, self.hidden_dim),
-                                                          torch.nn.BatchNorm1d(self.hidden_dim),
-                                                          torch.nn.ReLU(inplace=True),
-                                                          torch.nn.Linear(self.hidden_dim, self.pred_dim))
+        self.query_prediction_layer = torch.nn.Sequential(
+            torch.nn.Linear(self.pred_dim, self.hidden_dim),
+            torch.nn.BatchNorm1d(self.hidden_dim),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.Linear(self.hidden_dim, self.pred_dim)).to(self.device)
 
     def initialize(self):
         if not self.was_initialized:
@@ -109,6 +112,17 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
                 )
                 self.network = DDP(self.network, device_ids=[self.local_rank])
 
+                self.query_projection_layer = torch.nn.SyncBatchNorm.convert_sync_batchnorm(
+                    self.query_projection_layer
+                )
+
+                self.query_projection_layer = DDP(self.query_projection_layer, device_ids=[self.local_rank]) 
+
+                self.query_prediction_layer = torch.nn.SyncBatchNorm.convert_sync_batchnorm(
+                    self.query_prediction_layer
+                )
+                self.query_prediction_layer = DDP(self.query_prediction_layer, device_ids=[self.local_rank])
+
             self.loss = self._build_loss()
             self.was_initialized = True
         else:
@@ -124,8 +138,10 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
         all_params = list(self.network.parameters()) + list(self.query_projection_layer.parameters()) + list(
             self.key_projection_layer.parameters()) + list(self.query_prediction_layer.parameters())
 
-        return torch.optim.SGD(all_params, lr=self.learning_rate, weight_decay=self.weight_decay,
+        optim = torch.optim.SGD(all_params, lr=self.learning_rate, weight_decay=self.weight_decay,
                                momentum=self.sgd_momentum)
+
+        return optim, None
 
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
@@ -133,7 +149,7 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
         Momentum update of the key encoder
         """
         # update key encoder
-        for param_q, param_k in zip(self.model.parameters(), self.target_model.parameters()):
+        for param_q, param_k in zip(self.network.parameters(), self.target_network.parameters()):
             param_k.data = param_k.data * self.momentum + param_q.data * (1. - self.momentum)
 
         # update key projection layer
@@ -153,15 +169,21 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
             self._momentum_update_key_encoder()
 
             # first view
-            p1 = self.query_prediction_layer(self.model(view1))
-            z2 = self.target_model(view2)
+            f1 = torch.flatten(self.gap(self.network(view1)), 1, -1)
+            p1 = self.query_prediction_layer(self.query_projection_layer(f1))
+            
+            f2 = torch.flatten(self.gap(self.target_network(view2)), 1, -1)
+            z2 = self.key_projection_layer(f2)
 
             # reverse views
-            p2 = self.query_prediction_layer(self.model(view2))
-            z1 = self.target_model(view1)
+            f2 = torch.flatten(self.gap(self.network(view2)), 1, -1)
+            p2 = self.query_prediction_layer(self.query_projection_layer(f2))
+
+            f1 = torch.flatten(self.gap(self.target_network(view1)), 1, -1)
+            z1 = self.key_projection_layer(f1)
 
             loss = -2 * (self.loss(p1, z2).mean() + self.loss(p2, z1).mean())
-        return loss
+        return f2, loss
 
     def _initialize_projection_layers(self, in_dimension):
         self.query_projection_layer = torch.nn.Sequential(
@@ -171,7 +193,7 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
             torch.nn.Linear(self.hidden_dim, self.pred_dim),
         ).to(self.device)
 
-        self.key_projection_layer = torch.nn.Sequentia(
+        self.key_projection_layer = torch.nn.Sequential(
             torch.nn.Linear(in_dimension, self.hidden_dim),
             torch.nn.BatchNorm1d(self.hidden_dim),
             torch.nn.ReLU(inplace=True),
@@ -194,4 +216,12 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
             regions: List[Union[List[int], Tuple[int, ...], int]] = None,
             ignore_label: int = None,
     ) -> AbstractTransform:
-        return ContrastiveLearningViewGenerator(crop_size=patch_size)
+        transforms= Compose([
+            RandomFlip(),
+            RandomAffine(scales=(0.8, 1.2, 0.8, 1.2, 1, 1),
+                         degrees=(-10, 10, -10, 10, 0, 0)),
+
+            RandomBlur(),
+            RandomNoise()
+        ])
+        return ContrastiveLearningViewGenerator(crop_size=patch_size, base_transforms=transforms)
