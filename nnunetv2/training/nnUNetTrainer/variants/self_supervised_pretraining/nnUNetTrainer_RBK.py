@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from batchgenerators.transforms.abstract_transforms import AbstractTransform
 from torch import autocast, nn
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.rbk_transforms import (
     RBKTransform,
@@ -31,23 +32,22 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
     }
 
     def __init__(
-        self,
-        plans: dict,
-        configuration: str,
-        fold: int,
-        dataset_json: dict,
-        unpack_dataset: bool = True,
-        device: torch.device = torch.device("cuda"),
-        **kwargs,
+            self,
+            plans: dict,
+            configuration: str,
+            fold: int,
+            dataset_json: dict,
+            unpack_dataset: bool = True,
+            device: torch.device = torch.device("cuda"),
+            **kwargs,
     ):
         super().__init__(
             plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
         )
 
-        self.num_cubes = self.num_cubes_per_side**3
+        self.num_cubes = self.num_cubes_per_side ** 3
 
         # dynamic feature extractor initialization
-        self.gap = nn.AdaptiveAvgPool3d(1).to(self.device)
         self.feature_extractor = None
 
         self.order_fc = nn.Sequential(
@@ -99,6 +99,9 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
             self.optimizer, self.lr_scheduler = self.configure_optimizers()
             # if ddp, wrap in DDP wrapper
             if self.is_ddp:
+                self.feature_extractor = torch.nn.SyncBatchNorm.convert_sync_batchnorm(
+                    self.feature_extractor
+                )
                 self.network = torch.nn.SyncBatchNorm.convert_sync_batchnorm(
                     self.network
                 )
@@ -162,17 +165,6 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
         feature_vectors = torch.cat(feature_vectors, 1)
         return feature_vectors
 
-    def _determine_out_dimensionality(self):
-        # compute from patch size by running a nograd run
-        x, y, z = self.configuration_manager.patch_size
-        random_ipt = torch.randn((1, self.num_input_channels, x, y, z)).to(self.device)
-
-        with torch.no_grad():
-            output = self.gap(self.network(random_ipt))
-
-        flattened_output = torch.flatten(output, 1, -1)
-        return flattened_output.shape[1]
-
     def _initialize_feature_extractor(self, input_nodes):
         self.feature_extractor = nn.Sequential(
             nn.Linear(input_nodes, self.feature_dimension),
@@ -184,11 +176,11 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
 
     def configure_optimizers(self):
         all_parameters = (
-            list(self.network.parameters())
-            + list(self.feature_extractor.parameters())
-            + list(self.order_fc.parameters())
-            + list(self.ver_rot_fc.parameters())
-            + list(self.hor_rot_fc.parameters())
+                list(self.network.parameters())
+                + list(self.feature_extractor.parameters())
+                + list(self.order_fc.parameters())
+                + list(self.ver_rot_fc.parameters())
+                + list(self.hor_rot_fc.parameters())
         )
 
         optimizer = torch.optim.Adam(
@@ -210,18 +202,18 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
 
     @staticmethod
     def get_training_transforms(
-        patch_size: Union[np.ndarray, Tuple[int]],
-        rotation_for_DA: dict,
-        deep_supervision_scales: Union[List, Tuple, None],
-        mirror_axes: Tuple[int, ...],
-        do_dummy_2d_data_aug: bool,
-        order_resampling_data: int = 3,
-        order_resampling_seg: int = 1,
-        border_val_seg: int = -1,
-        use_mask_for_norm: List[bool] = None,
-        is_cascaded: bool = False,
-        foreground_labels: Union[Tuple[int, ...], List[int]] = None,
-        regions: List[Union[List[int], Tuple[int, ...], int]] = None,
-        ignore_label: int = None,
+            patch_size: Union[np.ndarray, Tuple[int]],
+            rotation_for_DA: dict,
+            deep_supervision_scales: Union[List, Tuple, None],
+            mirror_axes: Tuple[int, ...],
+            do_dummy_2d_data_aug: bool,
+            order_resampling_data: int = 3,
+            order_resampling_seg: int = 1,
+            border_val_seg: int = -1,
+            use_mask_for_norm: List[bool] = None,
+            is_cascaded: bool = False,
+            foreground_labels: Union[Tuple[int, ...], List[int]] = None,
+            regions: List[Union[List[int], Tuple[int, ...], int]] = None,
+            ignore_label: int = None,
     ) -> AbstractTransform:
         return RBKTransform(crop_size=patch_size)

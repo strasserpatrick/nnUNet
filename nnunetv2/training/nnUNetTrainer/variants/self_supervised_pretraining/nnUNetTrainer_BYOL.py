@@ -22,6 +22,9 @@ from nnunetv2.utilities.label_handling.label_handling import (
 
 class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
     DEFAULT_PARAMS: dict = {
+        "learning_rate": 1e-4,
+        "sgd_momentum": 0.9,
+        "weight_decay": 1e-4,
         "hidden_dim": 4096,  # TODO: this is probably too high?
         "pred_dim": 256,
         "momentum": 0.996,
@@ -58,7 +61,7 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
                 self.plans_manager, self.configuration_manager, self.dataset_json
             )
 
-            self.encoder_q = self.build_network_architecture(
+            self.network = self.build_network_architecture(
                 self.configuration_manager.network_arch_class_name,
                 self.configuration_manager.network_arch_init_kwargs,
                 self.configuration_manager.network_arch_init_kwargs_req_import,
@@ -67,7 +70,7 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
                 self.enable_deep_supervision,
             ).to(self.device)
 
-            self.encoder_k = self.build_network_architecture(
+            self.target_network = self.build_network_architecture(
                 self.configuration_manager.network_arch_class_name,
                 self.configuration_manager.network_arch_init_kwargs,
                 self.configuration_manager.network_arch_init_kwargs_req_import,
@@ -75,12 +78,15 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
                 self.label_manager.num_segmentation_heads,
                 self.enable_deep_supervision,
             ).to(self.device)
+
+            out_dim = self._determine_out_dimensionality()
+            self._initialize_projection_layers(out_dim)
 
             self.print_to_log_file("Cloning weights of query to key encoder and disabling gradient updates")
             for param_q, param_k in tqdm(
                     zip(
                         self.network.parameters(),
-                        self.momentum_encoder_network.parameters(),
+                        self.target_network.parameters(),
                     )
             ):
                 param_k.data.copy_(param_q.data)  # initialize
@@ -89,13 +95,19 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
             # compile network for free speedup
             if self._do_i_compile():
                 self.print_to_log_file("Using torch.compile...")
-                self.encoder_q = torch.compile(self.encoder_q)
-                self.encoder_k = torch.compile(self.encoder_k)
+                self.network = torch.compile(self.network)
+                self.target_network = torch.compile(self.target_network)
 
             self.optimizer, self.lr_scheduler = self.configure_optimizers()
             # if ddp, wrap in DDP wrapper
             if self.is_ddp:
-                self.encoder_q = DDP(self.network, device_ids=[self.local_rank])
+                self.target_network = torch.nn.SyncBatchNorm.convert_sync_batchnorm(
+                    self.target_network
+                )
+                self.network = torch.nn.SyncBatchNorm.convert_sync_batchnorm(
+                    self.network
+                )
+                self.network = DDP(self.network, device_ids=[self.local_rank])
 
             self.loss = self._build_loss()
             self.was_initialized = True
@@ -109,17 +121,19 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
         return torch.nn.CosineSimilarity(dim=1)
 
     def configure_optimizers(self):
-        # return torch.optim.SGD(self.encoder)
-        ...
+        all_params = list(self.network.parameters()) + list(self.query_projection_layer.parameters()) + list(
+            self.key_projection_layer.parameters()) + list(self.query_prediction_layer.parameters())
+
+        return torch.optim.SGD(all_params, lr=self.learning_rate, weight_decay=self.weight_decay,
+                               momentum=self.sgd_momentum)
 
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
         """
         Momentum update of the key encoder
         """
-
         # update key encoder
-        for param_q, param_k in zip(self.encoder_q.parameters(), self.encoder_k.parameters()):
+        for param_q, param_k in zip(self.model.parameters(), self.target_model.parameters()):
             param_k.data = param_k.data * self.momentum + param_q.data * (1. - self.momentum)
 
         # update key projection layer
@@ -138,31 +152,31 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
 
             self._momentum_update_key_encoder()
 
-            p1 = self.query_prediction_layer(self.encoder_q(view1))
-            z2 = self.encoder_k(view2)
+            # first view
+            p1 = self.query_prediction_layer(self.model(view1))
+            z2 = self.target_model(view2)
 
-            p2 = self.query_prediction_layer(self.encoder_q(view2))
-            z1 = self.encoder_k(view1)
+            # reverse views
+            p2 = self.query_prediction_layer(self.model(view2))
+            z1 = self.target_model(view1)
 
             loss = -2 * (self.loss(p1, z2).mean() + self.loss(p2, z1).mean())
-
         return loss
 
-    def initialize_projection_layers(self, in_dimension):
-        if not self.query_projection_layer:
-            self.query_projection_layer = torch.nn.Sequentia(
-                torch.nn.Linear(in_dimension, self.hidden_dim),
-                torch.nn.BatchNorm1d(self.hidden_dim),
-                torch.nn.ReLU(inplace=True),
-                torch.nn.Linear(self.hidden_dim, self.pred_dim),
-            ).to(self.device)
+    def _initialize_projection_layers(self, in_dimension):
+        self.query_projection_layer = torch.nn.Sequential(
+            torch.nn.Linear(in_dimension, self.hidden_dim),
+            torch.nn.BatchNorm1d(self.hidden_dim),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.Linear(self.hidden_dim, self.pred_dim),
+        ).to(self.device)
 
-            self.query_projection_layer = torch.nn.Sequentia(
-                torch.nn.Linear(in_dimension, self.hidden_dim),
-                torch.nn.BatchNorm1d(self.hidden_dim),
-                torch.nn.ReLU(inplace=True),
-                torch.nn.Linear(self.hidden_dim, self.pred_dim),
-            ).to(self.device)
+        self.key_projection_layer = torch.nn.Sequentia(
+            torch.nn.Linear(in_dimension, self.hidden_dim),
+            torch.nn.BatchNorm1d(self.hidden_dim),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.Linear(self.hidden_dim, self.pred_dim),
+        ).to(self.device)
 
     @staticmethod
     def get_training_transforms(
