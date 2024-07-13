@@ -5,24 +5,12 @@ import numpy as np
 import torch
 import torch.nn
 import torch.nn.functional as F
-from batchgenerators.transforms.abstract_transforms import AbstractTransform, Compose
-from batchgenerators.transforms.color_transforms import BrightnessMultiplicativeTransform, \
-    ContrastAugmentationTransform, GammaTransform
-from batchgenerators.transforms.noise_transforms import (
-    GaussianNoiseTransform,
-    GaussianBlurTransform,
-)
-from batchgenerators.transforms.resample_transforms import SimulateLowResolutionTransform
-from batchgenerators.transforms.spatial_transforms import MirrorTransform, SpatialTransform
-from batchgenerators.transforms.utility_transforms import NumpyToTensor, RemoveLabelTransform
+from batchgenerators.transforms.abstract_transforms import AbstractTransform
 from torch import autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim.lr_scheduler import LambdaLR
 from tqdm import tqdm
 
-from nnunetv2.training.data_augmentation.custom_transforms.masking import MaskTransform
-from nnunetv2.training.data_augmentation.custom_transforms.transforms_for_dummy_2d import Convert3DTo2DTransform, \
-    Convert2DTo3DTransform
 from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.contrastive_view_generator import (
     ContrastiveLearningViewGenerator,
 )
@@ -273,18 +261,18 @@ class nnUNetTrainer_MoCo(nnUNetSSLBaseTrainer):
                 in_dimension, self.projection_layer_dimension
             ).to(self.device)
 
-        self.key_projection_layer = torch.nn.Linear(
-            in_dimension, self.projection_layer_dimension
-        ).to(self.device)
+            self.key_projection_layer = torch.nn.Linear(
+                in_dimension, self.projection_layer_dimension
+            ).to(self.device)
 
-        for param_q, param_k in tqdm(
-                zip(
-                    self.query_projection_layer.parameters(),
-                    self.key_projection_layer.parameters(),
-                )
-        ):
-            param_k.data.copy_(param_q.data)  # initialize
-            param_k.requires_grad = False  # not update by gradient
+            for param_q, param_k in tqdm(
+                    zip(
+                        self.query_projection_layer.parameters(),
+                        self.key_projection_layer.parameters(),
+                    )
+            ):
+                param_k.data.copy_(param_q.data)  # initialize
+                param_k.requires_grad = False  # not update by gradient
 
     @staticmethod
     def get_training_transforms(
