@@ -31,6 +31,18 @@ class nnUNetSSLBaseTrainer(nnUNetTrainer):
             )
 
         self._set_hyperparameters(**kwargs)
+        self.gap = torch.nn.AdaptiveAvgPool3d(1).to(self.device)
+
+    def _determine_out_dimensionality(self):
+        # compute from patch size by running a nograd run
+        x, y, z = self.configuration_manager.patch_size
+        random_ipt = torch.randn((1, self.num_input_channels, x, y, z)).to(self.device)
+
+        with torch.no_grad():
+            output = self.gap(self.network(random_ipt))
+
+        flattened_output = torch.flatten(output, 1, -1)
+        return flattened_output.shape[1]
 
     def _set_hyperparameters(self, **kwargs):
         if not hasattr(self, "DEFAULT_PARAMS"):
