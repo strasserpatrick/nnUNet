@@ -30,6 +30,7 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
         "hidden_dim": 1024,
         "pred_dim": 256,
         "momentum": 0.996,
+        "num_val_iterations_per_epoch": 0,
     }
 
     def __init__(
