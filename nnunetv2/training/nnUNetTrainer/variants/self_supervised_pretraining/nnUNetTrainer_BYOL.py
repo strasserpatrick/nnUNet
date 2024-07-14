@@ -172,16 +172,18 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
             # first view
             f1 = torch.flatten(self.gap(self.network(view1)), 1, -1)
             p1 = self.query_prediction_layer(self.query_projection_layer(f1))
-            
-            f2 = torch.flatten(self.gap(self.target_network(view2)), 1, -1)
-            z2 = self.key_projection_layer(f2)
+
+            with torch.no_grad():
+                f2 = torch.flatten(self.gap(self.target_network(view2)), 1, -1)
+                z2 = self.key_projection_layer(f2)
 
             # reverse views
             f2 = torch.flatten(self.gap(self.network(view2)), 1, -1)
             p2 = self.query_prediction_layer(self.query_projection_layer(f2))
 
-            f1 = torch.flatten(self.gap(self.target_network(view1)), 1, -1)
-            z1 = self.key_projection_layer(f1)
+            with torch.no_grad():
+                f1 = torch.flatten(self.gap(self.target_network(view1)), 1, -1)
+                z1 = self.key_projection_layer(f1)
 
             loss = -2 * (self.loss(p1, z2).mean() + self.loss(p2, z1).mean())
         return f2, loss
