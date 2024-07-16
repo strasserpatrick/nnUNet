@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from scipy.special import comb
 
 
@@ -54,13 +55,18 @@ def bezier_curve(points, nTimes=1000):
     return xvals, yvals
 
 
-def view_data(data):
+def view_data(*data):
+    data = np.stack(data)
+
     from batchviewer import view_batch
     # we can only view 4D data => reduce
 
     # if data.ndim == 5 (batch, channels, w, h, d) => (batch, w, h, d)
     if data.ndim == 5:
-        data = data[:, 0]
+        # randomly_select a channel
+        num_channels = data.shape[1]
+        channel_idx = np.random.randint(0, num_channels)
+        data = data[:, channel_idx]
 
     # if data.ndim == 6 (batch, augmentation_views, channels, w, h, d, t) => (augmentation_views, w, h, d)
     if data.ndim == 6:

@@ -45,7 +45,7 @@ class MGTransform(AbstractTransform):
         gt = copy.deepcopy(input_patch)
 
         # Flipping
-        flipped_input_patch, gt = self._data_augmentation(input_patch, gt)
+        flipped_input_patch, flipped_gt = self._data_augmentation(input_patch, gt)
 
         # Local Shuffling Pixel
         shuffled_input_patch = self._local_pixel_shuffling(flipped_input_patch)
@@ -54,16 +54,16 @@ class MGTransform(AbstractTransform):
         transformed_input_patch = self._nonlinear_transformation(shuffled_input_patch)
 
         # Inpainting & Outpainting
-        if np.random.rand() < self.paint_rate:
-            transformed_input_patch = self._inpainting(transformed_input_patch)
+        if np.random.uniform() < self.paint_rate:
+            painted_input_patch = self._inpainting(transformed_input_patch)
         else:
-            transformed_input_patch = self._outpainting(transformed_input_patch)
+            painted_input_patch = self._outpainting(transformed_input_patch)
 
-        return transformed_input_patch, gt
+        return painted_input_patch, flipped_gt
 
     def _data_augmentation(self, ipt, gt):
         count = 3
-        while np.random.rand() < self.flip_rate and count > 0:
+        while np.random.uniform() < self.flip_rate and count > 0:
             axis = np.random.randint(0, 3)
             ipt = np.flip(ipt, axis=axis)
             gt = np.flip(gt, axis=axis)
@@ -72,7 +72,7 @@ class MGTransform(AbstractTransform):
         return ipt, gt
 
     def _local_pixel_shuffling(self, ipt):
-        if np.random.rand() >= self.local_pixel_shuffling_rate:
+        if np.random.uniform() >= self.local_pixel_shuffling_rate:
             return ipt
 
         image_temp = copy.deepcopy(ipt)
@@ -103,11 +103,12 @@ class MGTransform(AbstractTransform):
         return local_shuffling_x
 
     def _nonlinear_transformation(self, x):
-        if np.random.random() >= self.nonlinear_transformation_rate:
+        if np.random.uniform() >= self.nonlinear_transformation_rate:
             return x
-        points = [[0, 0], [np.random.random(), np.random.random()], [np.random.random(), np.random.random()], [1, 1]]
+        points = [[0, 0], [np.random.uniform(), np.random.uniform()], [np.random.uniform(), np.random.uniform()],
+                  [1, 1]]
         xvals, yvals = bezier_curve(points, nTimes=100000)
-        if np.random.random() < 0.5:
+        if np.random.uniform() < 0.5:
             # Half change to get flip
             xvals = np.sort(xvals)
         else:
@@ -119,7 +120,7 @@ class MGTransform(AbstractTransform):
     def _inpainting(x):
         _, img_rows, img_cols, img_deps = x.shape
         cnt = 5
-        while cnt > 0 and np.random.random() < 0.95:
+        while cnt > 0 and np.random.uniform() < 0.95:
             block_noise_size_x = np.random.randint(img_rows // 6, img_rows // 3)
             block_noise_size_y = np.random.randint(img_cols // 6, img_cols // 3)
             block_noise_size_z = np.random.randint(img_deps // 6, img_deps // 3)
@@ -153,7 +154,7 @@ class MGTransform(AbstractTransform):
                                                 noise_y:noise_y + block_noise_size_y,
                                                 noise_z:noise_z + block_noise_size_z]
         cnt = 4
-        while cnt > 0 and np.random.random() < 0.95:
+        while cnt > 0 and np.random.uniform() < 0.95:
             block_noise_size_x = img_rows - np.random.randint(3 * img_rows // 7, 4 * img_rows // 7)
             block_noise_size_y = img_cols - np.random.randint(3 * img_cols // 7, 4 * img_cols // 7)
             block_noise_size_z = img_deps - np.random.randint(3 * img_deps // 7, 4 * img_deps // 7)
