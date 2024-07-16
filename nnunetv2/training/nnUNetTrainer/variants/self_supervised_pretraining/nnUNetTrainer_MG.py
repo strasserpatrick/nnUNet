@@ -88,7 +88,11 @@ class nnUNetTrainer_MG(nnUNetSSLBaseTrainer):
             if self.device.type == "cuda"
             else dummy_context()
         ):
-            logits = self.network(data)
+            f = self.network(data) # this is the encoder
+            logits = self.decoder(f) # and decoding it back to full size
+
+            if isinstance(logits, list):
+                logits = logits[-1]
             loss = self.loss(logits, target)
 
         return logits, loss
