@@ -47,7 +47,7 @@ class nnUNetTrainer_MG(nnUNetSSLBaseTrainer):
                 self.configuration_manager.network_arch_init_kwargs,
                 self.configuration_manager.network_arch_init_kwargs_req_import,
                 self.num_input_channels,
-                self.label_manager.num_segmentation_heads,
+                self.num_input_channels, # output channels = input channels for MG as we mimic an autoencoder
                 self.enable_deep_supervision
             ).to(self.device)
 
