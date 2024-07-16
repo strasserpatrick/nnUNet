@@ -47,7 +47,7 @@ class nnUNetTrainer_MG(nnUNetSSLBaseTrainer):
                 self.configuration_manager.network_arch_init_kwargs,
                 self.configuration_manager.network_arch_init_kwargs_req_import,
                 self.num_input_channels,
-                self.num_input_channels, # output channels = input channels for MG as we mimic an autoencoder
+                self.num_input_channels,  # output channels = input channels for MG as we mimic an autoencoder
                 self.enable_deep_supervision
             ).to(self.device)
 
@@ -88,11 +88,9 @@ class nnUNetTrainer_MG(nnUNetSSLBaseTrainer):
             if self.device.type == "cuda"
             else dummy_context()
         ):
-            f = self.network(data) # this is the encoder
-            logits = self.decoder(f) # and decoding it back to full size
+            f = self.network(data)  # this is the encoder
+            logits = self.decoder(f)  # and decoding it back to full size
 
-            if isinstance(logits, list):
-                logits = logits[-1]
             loss = self.loss(logits, target)
 
         return logits, loss
