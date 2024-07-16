@@ -6,7 +6,6 @@ from batchgenerators.transforms.utility_transforms import NumpyToTensor
 from torchio import RandomFlip, RandomAffine, RandomBlur, Compose
 
 
-
 class ContrastiveLearningViewGenerator(AbstractTransform):
 
     def __init__(self, crop_size, base_transforms: Compose = None):
@@ -80,19 +79,3 @@ class ContrastiveLearningViewGenerator(AbstractTransform):
             cropped_data.append(torch.stack((crop1, crop2), dim=0))
 
         return torch.stack(cropped_data, dim=0)
-
-    @staticmethod
-    def view_data(data):
-        
-        from batchviewer import view_batch
-        # we can only view 4D data => reduce
-
-        # if data.ndim == 5 (batch, channels, w, h, d) => (batch, w, h, d)
-        if data.ndim == 5:
-            data = data[:, 0]
-
-        # if data.ndim == 6 (batch, augmentation_views, channels, w, h, d, t) => (augmentation_views, w, h, d)
-        if data.ndim == 6:
-            data = data[0, :, 0]
-
-        view_batch(data, width=300, height=300)

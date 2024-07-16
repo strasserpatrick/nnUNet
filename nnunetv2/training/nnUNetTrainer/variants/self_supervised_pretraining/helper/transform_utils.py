@@ -52,3 +52,18 @@ def bezier_curve(points, nTimes=1000):
     yvals = np.dot(yPoints, polynomial_array)
 
     return xvals, yvals
+
+
+def view_data(data):
+    from batchviewer import view_batch
+    # we can only view 4D data => reduce
+
+    # if data.ndim == 5 (batch, channels, w, h, d) => (batch, w, h, d)
+    if data.ndim == 5:
+        data = data[:, 0]
+
+    # if data.ndim == 6 (batch, augmentation_views, channels, w, h, d, t) => (augmentation_views, w, h, d)
+    if data.ndim == 6:
+        data = data[0, :, 0]
+
+    view_batch(data, width=300, height=300)
