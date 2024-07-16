@@ -29,6 +29,9 @@ class MGTransform(AbstractTransform):
             result_dict["data"].append(d)
             result_dict["target"].append(t)
 
+        result_dict["data"] = np.stack(result_dict["data"])
+        result_dict["target"] = np.stack(result_dict["target"])
+
         return NumpyToTensor(keys=["data", "target"])(**result_dict)
 
     def mg_transform(self, data):
@@ -54,7 +57,7 @@ class MGTransform(AbstractTransform):
         if np.random.rand() < self.paint_rate:
             transformed_input_patch = self._inpainting(transformed_input_patch)
         else:
-            transformed_input_patch = self._outpainting()
+            transformed_input_patch = self._outpainting(transformed_input_patch)
 
         return transformed_input_patch, gt
 
