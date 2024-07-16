@@ -59,6 +59,24 @@
                 "-p",
                 "nnUNetPlans_simclr",
             ]
+        },
+        {
+            "name": "MG",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/nnunetv2/run/run_training.py",
+            "console": "internalConsole",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env",
+            "args": [
+                "300", 
+                "3d_fullres",
+                "all",
+                "-tr",
+                "nnUNetTrainer_MG",
+                "-p",
+                "nnUNetPlans43MG"
+            ]
         }
     ]
 }

@@ -4,6 +4,8 @@ import numpy as np
 from batchgenerators.transforms.abstract_transforms import AbstractTransform
 from batchgenerators.transforms.utility_transforms import NumpyToTensor
 
+from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.transform_utils import crop_data
+
 helper_dir = Path(__file__).parent
 
 
@@ -67,25 +69,6 @@ class RBKTransform(AbstractTransform):
             ver_label,
         )
 
-    @staticmethod
-    def _crop_data(data, crop_size, center_crop=True):
-        _, data_h, data_w, data_d = data.shape
-
-        if center_crop:
-            x_start = (data_h - crop_size[0]) // 2
-            y_start = (data_w - crop_size[1]) // 2
-            z_start = (data_d - crop_size[2]) // 2
-        else:
-            x_start = np.random.randint(0, data_h - crop_size[0])
-            y_start = np.random.randint(0, data_w - crop_size[1])
-            z_start = np.random.randint(0, data_d - crop_size[2])
-
-        x_end = x_start + crop_size[0]
-        y_end = y_start + crop_size[1]
-        z_end = z_start + crop_size[2]
-
-        return data[:, x_start:x_end, y_start:y_end, z_start:z_end]
-
     def _extract_3d_cubes(self, data):
         """
         Crops cubes from 3D Image
@@ -121,7 +104,7 @@ class RBKTransform(AbstractTransform):
 
                     # crop the patch if the patch is smaller than the grid
                     if h_patch < h_grid or w_patch < w_grid or d_patch < d_grid:
-                        p = self._crop_data(p, (h_patch, w_patch, d_patch))
+                        p = crop_data(p, (h_patch, w_patch, d_patch))
 
                     cubes.append(p)
 
