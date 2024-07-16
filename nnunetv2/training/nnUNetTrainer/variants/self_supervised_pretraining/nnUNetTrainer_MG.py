@@ -11,6 +11,9 @@ from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper
     nnUNetSSLBaseTrainer,
 )
 from nnunetv2.utilities.helpers import dummy_context
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+from nnunetv2.utilities.label_handling.label_handling import determine_num_input_channels
 
 
 class nnUNetTrainer_MG(nnUNetSSLBaseTrainer):
@@ -34,11 +37,50 @@ class nnUNetTrainer_MG(nnUNetSSLBaseTrainer):
             plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
         )
 
+    def initialize(self):
+        if not self.was_initialized:
+            self.num_input_channels = determine_num_input_channels(self.plans_manager, self.configuration_manager,
+                                                                   self.dataset_json)
+
+            full_model = self.build_network_architecture(
+                self.configuration_manager.network_arch_class_name,
+                self.configuration_manager.network_arch_init_kwargs,
+                self.configuration_manager.network_arch_init_kwargs_req_import,
+                self.num_input_channels,
+                self.label_manager.num_segmentation_heads,
+                self.enable_deep_supervision
+            ).to(self.device)
+
+            self.network = full_model.encoder
+            self.decoder = full_model.decoder
+
+            # compile network for free speedup
+            if self._do_i_compile():
+                self.print_to_log_file('Using torch.compile...')
+                self.network = torch.compile(self.network)
+                self.decoder = torch.compile(self.decoder)
+
+            self.optimizer, self.lr_scheduler = self.configure_optimizers()
+            # if ddp, wrap in DDP wrapper
+            if self.is_ddp:
+                self.network = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.network)
+                self.network = DDP(self.network, device_ids=[self.local_rank])
+
+                self.decoder = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.decoder)
+                self.decoder = DDP(self.decoder, device_ids=[self.local_rank])
+
+            self.loss = self._build_loss()
+            self.was_initialized = True
+        else:
+            raise RuntimeError("You have called self.initialize even though the trainer was already initialized. "
+                               "That should not happen.")
+
     def _build_loss(self):
         return torch.nn.MSELoss()
 
     def configure_optimizers(self):
-        return torch.optim.SGD(self.network.parameters(), self.learning_rate, momentum=self.sgd_momentum), None
+        all_params = list(self.network.parameters()) + list(self.decoder.parameters())
+        return torch.optim.SGD(all_params, self.learning_rate, momentum=self.sgd_momentum), None
 
     def forward(self, data, target):
         with (
