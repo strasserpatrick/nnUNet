@@ -29,8 +29,9 @@ class MGTransform(AbstractTransform):
             result_dict["data"].append(d)
             result_dict["target"].append(t)
 
-        result_dict["data"] = np.stack(result_dict["data"])
-        result_dict["target"] = np.stack(result_dict["target"])
+        # autocast (torch) only works for float32 not float64
+        result_dict["data"] = np.stack(result_dict["data"]).astype(np.float32)
+        result_dict["target"] = np.stack(result_dict["target"]).astype(np.float32)
 
         return NumpyToTensor(keys=["data", "target"])(**result_dict)
 
