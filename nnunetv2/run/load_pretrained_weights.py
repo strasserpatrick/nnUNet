@@ -34,9 +34,8 @@ def load_pretrained_weights(network, fname, encoder_only: bool = False, verbose=
         mod = mod._orig_mod
 
     if encoder_only:
-        model_dict = mod.encoder.state_dict()
-    else:
-        model_dict = mod.state_dict()
+        mod = mod.encoder
+    model_dict = mod.state_dict()
         
     # verify that all but the segmentation layers have the same shape
     for key, _ in model_dict.items():
@@ -69,9 +68,6 @@ def load_pretrained_weights(network, fname, encoder_only: bool = False, verbose=
         for key, value in pretrained_dict.items():
             print(key, 'shape', value.shape)
         print("################### Done ###################")
-    if encoder_only:
-        mod.encoder.load_state_dict(model_dict)
-    else:
-        mod.load_state_dict(model_dict)
+    mod.load_state_dict(model_dict)
 
 
