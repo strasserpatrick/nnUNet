@@ -51,7 +51,7 @@ class RBKTransform(AbstractTransform):
         :return dictionary containing the transformed data with labels
         """
         # crop the image to the same size
-        cropped_data = self._crop_data(data, crop_size=self.crop_size)
+        cropped_data = crop_data(data, crop_size=self.crop_size)
 
         # extract cubes from 3d volume
         all_cubes = self._extract_3d_cubes(cropped_data)
