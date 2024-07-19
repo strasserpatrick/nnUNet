@@ -118,7 +118,7 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
                     self.query_projection_layer
                 )
 
-                self.query_projection_layer = DDP(self.query_projection_layer, device_ids=[self.local_rank]) 
+                self.query_projection_layer = DDP(self.query_projection_layer, device_ids=[self.local_rank])
 
                 self.query_prediction_layer = torch.nn.SyncBatchNorm.convert_sync_batchnorm(
                     self.query_prediction_layer
@@ -141,7 +141,7 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
             self.key_projection_layer.parameters()) + list(self.query_prediction_layer.parameters())
 
         optim = torch.optim.SGD(all_params, lr=self.learning_rate, weight_decay=self.weight_decay,
-                               momentum=self.sgd_momentum)
+                                momentum=self.sgd_momentum)
 
         return optim, None
 
@@ -167,14 +167,6 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
             else dummy_context()
         ):
             view1, view2 = data[:, 0], data[:, 1]
-
-            if view1.ndim != 5 or view1.shape[1] != 4:
-                print("wtf view1")
-                print(view1.shape)
-
-            if view2.ndim != 5 or view2.shape[1] != 4:
-                print("wtf view2")
-                print(view2.shape)
 
             self._momentum_update_key_encoder()
 
@@ -228,7 +220,7 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
             regions: List[Union[List[int], Tuple[int, ...], int]] = None,
             ignore_label: int = None,
     ) -> AbstractTransform:
-        transforms= Compose([
+        transforms = Compose([
             RandomFlip(),
             RandomAffine(scales=(0.8, 1.2, 0.8, 1.2, 1, 1),
                          degrees=(-10, 10, -10, 10, 0, 0)),
