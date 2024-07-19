@@ -21,12 +21,12 @@ from nnunetv2.utilities.label_handling.label_handling import (
 class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
     DEFAULT_PARAMS: dict = {
         "num_val_iterations_per_epoch": 0,
-        "num_epochs": 100,
+        "num_epochs": 200,
         "batch_size": 8,
         "feature_dimension": 64,
         "order_n_class": 100,  # we need as many classes as total permutations to guess from
         "num_cubes_per_side": 2,
-        "learning_rate": 1e-3,
+        "learning_rate": 1e-2,
         "learning_rate_decay": [250],
         "weight_decay": 1e-6,
     }
