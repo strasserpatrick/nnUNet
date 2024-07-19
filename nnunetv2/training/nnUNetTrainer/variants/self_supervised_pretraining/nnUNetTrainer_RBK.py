@@ -26,7 +26,7 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
         "feature_dimension": 64,
         "order_n_class": 100,  # we need as many classes as total permutations to guess from
         "num_cubes_per_side": 2,
-        "learning_rate": 1e-2,
+        "learning_rate": 1e-3,
         "learning_rate_decay": [250],
         "weight_decay": 1e-6,
     }
