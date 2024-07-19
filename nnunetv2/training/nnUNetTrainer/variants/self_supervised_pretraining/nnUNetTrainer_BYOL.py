@@ -28,7 +28,7 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
         "learning_rate": 1e-3,
         "sgd_momentum": 0.9,
         "weight_decay": 1e-4,
-        "hidden_dim": 1024,
+        "hidden_dim": 256,
         "pred_dim": 256,
         "momentum": 0.996,
         "num_val_iterations_per_epoch": 0,
