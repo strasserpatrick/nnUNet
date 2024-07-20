@@ -25,8 +25,8 @@ from nnunetv2.utilities.label_handling.label_handling import (
 class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
     DEFAULT_PARAMS: dict = {
         "num_epochs": 300,
-        "learning_rate": 5e-4,
-        "sgd_momentum": 0.9,
+        "learning_rate": 1e-3,
+        # "sgd_momentum": 0.9,
         "weight_decay": 1e-4,
         "hidden_dim": 256,
         "pred_dim": 256,
@@ -140,8 +140,7 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
         all_params = list(self.network.parameters()) + list(self.query_projection_layer.parameters()) + list(
             self.key_projection_layer.parameters()) + list(self.query_prediction_layer.parameters())
 
-        optim = torch.optim.SGD(all_params, lr=self.learning_rate, weight_decay=self.weight_decay,
-                                momentum=self.sgd_momentum)
+        optim = torch.optim.Adam(all_params, lr=self.learning_rate, weight_decay=self.weight_decay)
 
         return optim, None
 
