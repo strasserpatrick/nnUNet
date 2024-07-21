@@ -25,7 +25,7 @@ from nnunetv2.utilities.label_handling.label_handling import (
 class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
     DEFAULT_PARAMS: dict = {
         "num_epochs": 300,
-        "learning_rate": 1e-3,
+        "learning_rate": 1e-4,
         # "sgd_momentum": 0.9,
         "weight_decay": 1e-4,
         "hidden_dim": 256,
