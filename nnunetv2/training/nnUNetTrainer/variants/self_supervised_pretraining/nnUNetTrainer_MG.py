@@ -18,7 +18,7 @@ from nnunetv2.utilities.label_handling.label_handling import determine_num_input
 
 class nnUNetTrainer_MG(nnUNetSSLBaseTrainer):
     DEFAULT_PARAMS: dict = {
-        "num_epochs": 200,
+        "num_epochs": 300,
         "num_val_iterations_per_epoch": 0,
         "learning_rate": 1e-3,
         "sgd_momentum": 0.9,
