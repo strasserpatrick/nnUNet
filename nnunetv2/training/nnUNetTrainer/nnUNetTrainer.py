@@ -74,7 +74,7 @@ class nnUNetTrainer(object):
         "oversample_foreground_percent": 0.33,
         "num_iterations_per_epoch": 250,
         "num_val_iterations_per_epoch": 50,
-        "num_epochs": 200,
+        "num_epochs": 1000,
         "current_epoch": 0,
         "enable_deep_supervision": True,
     }
