@@ -35,9 +35,10 @@ class nnUNetTrainerNoDA(nnUNetTrainer):
         )
 
     def configure_rotation_dummyDA_mirroring_and_inital_patch_size(self):
-        # we need to disable mirroring here so that no mirroring will be applied in inference!
+        # we need to disable mirroring here so that no mirroring will be applied in inferene!
         rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes = \
             super().configure_rotation_dummyDA_mirroring_and_inital_patch_size()
         mirror_axes = None
         self.inference_allowed_mirroring_axes = None
         return rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes
+
