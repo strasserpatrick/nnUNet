@@ -67,17 +67,6 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 
 class nnUNetTrainer(object):
-    DEFAULT_HYPERPARAMETER_VALUES = {
-        ### Some hyperparameters for you to fiddle with
-        "initial_lr": 1e-2,
-        "weight_decay": 3e-5,
-        "oversample_foreground_percent": 0.33,
-        "num_iterations_per_epoch": 250,
-        "num_val_iterations_per_epoch": 50,
-        "num_epochs": 500,
-        "current_epoch": 0,
-        "enable_deep_supervision": True,
-    }
 
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict, unpack_dataset: bool = True,
                  device: torch.device = torch.device('cuda'), **kwargs):
@@ -124,7 +113,17 @@ class nnUNetTrainer(object):
         for k in inspect.signature(self.__init__).parameters.keys():
             self.my_init_kwargs[k] = locals()[k]
 
-        ###  Saving all the init args into class variables for later access
+        # Some hyperparameters for you to fiddle with
+        self.initial_lr = 1e-2
+        self.weight_decay = 3e-5
+        self.oversample_foreground_percent = 0.33
+        self.num_iterations_per_epoch = 250
+        self.num_val_iterations_per_epoch = 50
+        self.num_epochs = 1000
+        self.current_epoch = 0
+        self.enable_deep_supervision = True
+
+        #  Saving all the init args into class variables for later access
         self.plans_manager = PlansManager(plans)
         self.configuration_manager = self.plans_manager.get_configuration(configuration)
         self.configuration_name = configuration
@@ -132,7 +131,7 @@ class nnUNetTrainer(object):
         self.fold = fold
         self.unpack_dataset = unpack_dataset
 
-        ### Setting all the folder names. We need to make sure things don't crash in case we are just running
+        # Setting all the folder names. We need to make sure things don't crash in case we are just running
         # inference and some of the folders may not be defined!
         self.preprocessed_dataset_folder_base = join(nnUNet_preprocessed, self.plans_manager.dataset_name) \
             if nnUNet_preprocessed is not None else None
@@ -154,7 +153,7 @@ class nnUNetTrainer(object):
                  self.configuration_manager.previous_stage_name, 'predicted_next_stage', self.configuration_name) \
                 if self.is_cascaded else None
 
-        ### Dealing with labels/regions
+        # Dealing with labels/regions
         self.label_manager = self.plans_manager.get_label_manager(dataset_json)
         # labels can either be a list of int (regular training) or a list of tuples of int (region-based training)
         # needed for predictions. We do sigmoid in case of (overlapping) regions
@@ -165,7 +164,7 @@ class nnUNetTrainer(object):
         self.grad_scaler = GradScaler() if self.device.type == 'cuda' else None
         self.loss = None  # -> self.initialize
 
-        ### Simple logging. Don't take that away from me!
+        # Simple logging. Don't take that away from me!
         # initialize log file. This is just our log for the print statements etc. Not to be confused with lightning
         # logging
         timestamp = datetime.now()
@@ -175,17 +174,17 @@ class nnUNetTrainer(object):
                               timestamp.second))
         self.logger = nnUNetLogger()
 
-        ### placeholders
+        # placeholders
         self.dataloader_train = self.dataloader_val = None  # see on_train_start
 
-        ### initializing stuff for remembering things and such
+        # initializing stuff for remembering things and such
         self._best_ema = None
 
-        ### inference things
+        # inference things
         self.inference_allowed_mirroring_axes = None  # this variable is set in
         # self.configure_rotation_dummyDA_mirroring_and_inital_patch_size and will be saved in checkpoints
 
-        ### checkpoint saving stuff
+        # checkpoint saving stuff
         self.save_every = 50
         self.disable_checkpointing = False
 
@@ -202,15 +201,6 @@ class nnUNetTrainer(object):
                                "Nature methods, 18(2), 203-211.\n"
                                "#######################################################################\n",
                                also_print_to_console=True, add_timestamp=False)
-
-    def set_hyperparameters(self, **kwargs):
-        for attribute_name in self.DEFAULT_HYPERPARAMETER_VALUES:
-            if attribute_name in kwargs:
-                # overwrite
-                setattr(self, attribute_name, kwargs[attribute_name])
-            else:
-                # default value
-                setattr(self, attribute_name, self.DEFAULT_HYPERPARAMETER_VALUES[attribute_name])
 
     def initialize(self):
         if not self.was_initialized:
