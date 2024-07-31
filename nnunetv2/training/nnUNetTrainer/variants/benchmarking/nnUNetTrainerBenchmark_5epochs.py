@@ -1,3 +1,5 @@
+import subprocess
+
 import torch
 from batchgenerators.utilities.file_and_folder_operations import save_json, join, isfile, load_json
 
@@ -7,8 +9,8 @@ from torch import distributed as dist
 
 class nnUNetTrainerBenchmark_5epochs(nnUNetTrainer):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict, unpack_dataset: bool = True,
-                 device: torch.device = torch.device('cuda'), **kwargs):
-        super().__init__(plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs)
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, unpack_dataset, device)
         assert self.fold == 0, "It makes absolutely no sense to specify a certain fold. Stick with 0 so that we can parse the results."
         self.disable_checkpointing = True
         self.num_epochs = 5
@@ -27,6 +29,7 @@ class nnUNetTrainerBenchmark_5epochs(nnUNetTrainer):
             super().run_training()
         except RuntimeError:
             self.crashed_with_runtime_error = True
+            self.on_train_end()
 
     def on_train_end(self):
         super().on_train_end()
@@ -53,13 +56,15 @@ class nnUNetTrainerBenchmark_5epochs(nnUNetTrainer):
             else:
                 old_results = {}
             # generate some unique key
-            my_key = f"{cudnn_version}__{torch_version.replace(' ', '')}__{gpu_name.replace(' ', '')}__gpus_{num_gpus}"
+            hostname = subprocess.getoutput('hostname')
+            my_key = f"{hostname}__{cudnn_version}__{torch_version.replace(' ', '')}__{gpu_name.replace(' ', '')}__num_gpus_{num_gpus}"
             old_results[my_key] = {
                 'torch_version': torch_version,
                 'cudnn_version': cudnn_version,
                 'gpu_name': gpu_name,
                 'fastest_epoch': fastest_epoch,
                 'num_gpus': num_gpus,
+                'hostname': hostname
             }
             save_json(old_results,
                       join(self.output_folder, 'benchmark_result.json'))

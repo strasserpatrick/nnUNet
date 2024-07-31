@@ -21,6 +21,7 @@ import numpy as np
 import re
 
 from nnunetv2.paths import nnUNet_raw
+from multiprocessing import Pool
 
 
 def get_identifiers_from_splitted_dataset_folder(folder: str, file_ending: str):
@@ -33,7 +34,12 @@ def get_identifiers_from_splitted_dataset_folder(folder: str, file_ending: str):
     return files
 
 
-def create_lists_from_splitted_dataset_folder(folder: str, file_ending: str, identifiers: List[str] = None) -> List[
+def create_paths_fn(folder, files, file_ending, f):
+    p = re.compile(re.escape(f) + r"_\d\d\d\d" + re.escape(file_ending))            
+    return [join(folder, i) for i in files if p.fullmatch(i)]
+
+
+def create_lists_from_splitted_dataset_folder(folder: str, file_ending: str, identifiers: List[str] = None, num_processes: int = 12) -> List[
     List[str]]:
     """
     does not rely on dataset.json
@@ -42,9 +48,11 @@ def create_lists_from_splitted_dataset_folder(folder: str, file_ending: str, ide
         identifiers = get_identifiers_from_splitted_dataset_folder(folder, file_ending)
     files = subfiles(folder, suffix=file_ending, join=False, sort=True)
     list_of_lists = []
-    for f in identifiers:
-        p = re.compile(re.escape(f) + r"_\d\d\d\d" + re.escape(file_ending))
-        list_of_lists.append([join(folder, i) for i in files if p.fullmatch(i)])
+
+    params_list = [(folder, files, file_ending, f) for f in identifiers]
+    with Pool(processes=num_processes) as pool:
+        list_of_lists = pool.starmap(create_paths_fn, params_list)
+        
     return list_of_lists
 
 
@@ -55,50 +63,18 @@ def get_filenames_of_train_images_and_targets(raw_dataset_folder: str, dataset_j
     if 'dataset' in dataset_json.keys():
         dataset = dataset_json['dataset']
         for k in dataset.keys():
-            dataset[k]['label'] = os.path.abspath(join(raw_dataset_folder, dataset[k]['label'])) if not os.path.isabs(dataset[k]['label']) else dataset[k]['label']
-            dataset[k]['images'] = [os.path.abspath(join(raw_dataset_folder, i)) if not os.path.isabs(i) else i for i in dataset[k]['images']]
+            dataset[k]['label'] = os.path.abspath(join(raw_dataset_folder, dataset[k]['label'])) if not os.path.isabs(
+                dataset[k]['label']) else dataset[k]['label']
+            dataset[k]['images'] = [os.path.abspath(join(raw_dataset_folder, i)) if not os.path.isabs(i) else i for i in
+                                    dataset[k]['images']]
     else:
-        identifiers = get_identifiers_from_splitted_dataset_folder(join(raw_dataset_folder, 'imagesTr'), dataset_json['file_ending'])
-        images = create_lists_from_splitted_dataset_folder(join(raw_dataset_folder, 'imagesTr'), dataset_json['file_ending'], identifiers)
+        identifiers = get_identifiers_from_splitted_dataset_folder(join(raw_dataset_folder, 'imagesTr'),
+                                                                   dataset_json['file_ending'])
+        images = create_lists_from_splitted_dataset_folder(join(raw_dataset_folder, 'imagesTr'),
+                                                           dataset_json['file_ending'], identifiers)
         segs = [join(raw_dataset_folder, 'labelsTr', i + dataset_json['file_ending']) for i in identifiers]
         dataset = {i: {'images': im, 'label': se} for i, im, se in zip(identifiers, images, segs)}
     return dataset
-
-
-def parse_unknown_argsparse_kv(unknown: List[str]) -> dict[str, Any]:
-    """
-    parses a list of not-parsable argsparse options into key-value pairs for additional configuration
-    e.g. --foo=bar, --set_flag and --baz bla;
-    """
-    kwargs = {}
-
-    i = 0
-    while i < len(unknown):
-        arg = unknown[i]
-
-        if not arg.startswith("--"):
-            raise ValueError("unparsable extra flag ", arg)
-
-        if "=" in arg:
-            # Case 1:
-            # --foo=bar
-            key, val = arg.split("=")
-            kwargs[key[2:]] = val
-            i += 1
-
-        elif i + 1 >= len(unknown) or (unknown[i+1].startswith("--")):
-            # Case 2:
-            # --foo (set to true)
-            kwargs[arg[2:]] = True
-            i += 1
-        else:
-            # Case 3:
-            # --foo bar
-
-            kwargs[arg[2:]] = unknown[i + 1]
-            i += 2
-
-    return kwargs
 
 
 if __name__ == '__main__':
