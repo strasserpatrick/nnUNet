@@ -31,10 +31,9 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
             dataset_json: dict,
             unpack_dataset: bool = True,
             device: torch.device = torch.device("cuda"),
-            **kwargs,
     ):
         super().__init__(
-            plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
+            plans, configuration, fold, dataset_json, unpack_dataset, device
         )
 
         self.num_epochs = 2000

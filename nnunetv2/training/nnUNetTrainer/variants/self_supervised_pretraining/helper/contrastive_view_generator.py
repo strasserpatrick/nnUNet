@@ -13,9 +13,9 @@ class ContrastiveLearningViewGenerator(AbstractTransform):
         self.crop_size = crop_size
 
     def __call__(self, **data_dict):
-        tensor_data_dict = NumpyToTensor(keys=["data"])(**data_dict)
+        tensor_data_dict = NumpyToTensor(keys=["image"])(**data_dict)
 
-        cropped_volumes = self._random_crop(tensor_data_dict['data'])
+        cropped_volumes = self._random_crop(tensor_data_dict['image'])
         transformed_volumes = []  # for each batch for each crop apply base_transforms
 
         for bs in range(cropped_volumes.shape[0]):
@@ -26,7 +26,7 @@ class ContrastiveLearningViewGenerator(AbstractTransform):
 
             transformed_volumes.append(torch.stack(crops, dim=0))
 
-        result_dict = {'target': None, 'data': torch.stack(transformed_volumes, dim=0)}
+        result_dict = {'segmentation': None, 'image': torch.stack(transformed_volumes, dim=0)}
         # batch, augmentation views, channels , w, h, d
 
         return result_dict
@@ -48,6 +48,9 @@ class ContrastiveLearningViewGenerator(AbstractTransform):
     """
 
     def _random_crop(self, data):
+        if data.ndim == 4:
+            data = data.unsqueeze(0)
+
         bs, _, w, h, d = data.shape
 
         cropped_data = []

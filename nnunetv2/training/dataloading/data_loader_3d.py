@@ -64,6 +64,8 @@ class nnUNetDataLoader3D(nnUNetDataLoaderBase):
                     data_all = torch.stack(images)
                     if isinstance(segs[0], list):
                         seg_all = [torch.stack([s[i] for s in segs]) for i in range(len(segs[0]))]
+                    elif segs[0] is None:
+                        seg_all = None
                     else:
                         seg_all = torch.stack(segs)
                     del segs, images

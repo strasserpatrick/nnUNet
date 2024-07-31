@@ -19,7 +19,6 @@ class nnUNetSSLBaseTrainer(nnUNetTrainer):
         dataset_json: dict,
         unpack_dataset: bool = True,
         device: torch.device = torch.device("cuda"),
-        **kwargs,
     ):
         super().__init__(
             plans, configuration, fold, dataset_json, unpack_dataset, device
@@ -42,18 +41,6 @@ class nnUNetSSLBaseTrainer(nnUNetTrainer):
 
         flattened_output = torch.flatten(output, 1, -1)
         return flattened_output.shape[1]
-
-    def _set_hyperparameters(self, **kwargs):
-        if not hasattr(self, "DEFAULT_PARAMS"):
-            print("Warning: DEFAULT_PARAMS not set in nnUNetSSLBaseTrainer")
-            return
-        for attribute_name in self.DEFAULT_PARAMS:
-            if attribute_name in kwargs:
-                # overwrite
-                setattr(self, attribute_name, kwargs[attribute_name])
-            else:
-                # default value
-                setattr(self, attribute_name, self.DEFAULT_PARAMS[attribute_name])
 
     def set_deep_supervision_enabled(self, enabled: bool):
         # we have deep supervision disabled, but as we do not have a decoder here,
