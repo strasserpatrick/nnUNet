@@ -28,20 +28,6 @@ resource: https://github.com/facebookresearch/moco
 
 
 class nnUNetTrainer_MoCo(nnUNetSSLBaseTrainer):
-    DEFAULT_PARAMS: dict = {
-        "initial_lr": 0.01,
-        "learning_rate_schedule": [120, 160],
-        "optimizer_momentum": 0.9,
-        "weight_decay": 1e-4,
-        "use_cosine_schedule": False,
-        "temperature": 0.07,
-        "queue_size": 65536,
-        "batch_size": 8,  # queue_size % batch_size has to be zero
-        "encoder_updating_momentum": 0.999,
-        "projection_layer_dimension": 128,
-        "num_val_iterations_per_epoch": 0,
-    }
-
     def __init__(
             self,
             plans: dict,
@@ -55,6 +41,18 @@ class nnUNetTrainer_MoCo(nnUNetSSLBaseTrainer):
         super().__init__(
             plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
         )
+
+        self.initial_lr = 0.01
+        self.learning_rate_schedule = [120, 160]
+        self.optimizer_momentum = 0.9
+        self.weight_decay = 1e-4
+        self.use_cosine_schedule = False
+        self.temperature = 0.07
+        self.queue_size = 65536
+        self.batch_size = 8
+        self.encoder_updating_momentum = 0.999
+        self.projection_layer_dimension = 128
+        self.num_val_iterations_per_epoch = 0
 
         self.key_projection_layer = None
         self.query_projection_layer = None

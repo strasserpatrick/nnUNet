@@ -23,17 +23,6 @@ from nnunetv2.utilities.label_handling.label_handling import (
 
 
 class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
-    DEFAULT_PARAMS: dict = {
-        "num_epochs": 2000,
-        "learning_rate": 1e-4,
-        # "sgd_momentum": 0.9,
-        "weight_decay": 1e-4,
-        "hidden_dim": 256,
-        "pred_dim": 256,
-        "momentum": 0.996,
-        "num_val_iterations_per_epoch": 0,
-    }
-
     def __init__(
             self,
             plans: dict,
@@ -47,6 +36,15 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
         super().__init__(
             plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
         )
+
+        self.num_epochs = 2000
+        self.learning_rate = 1e-4
+        self.weight_decay = 1e-4
+        self.hidden_dim = 256
+        self.pred_dim = 256
+        self.momentum = 0.996
+        self.num_val_iterations_per_epoch = 0
+        # self.sgd_momentum = 0.9
 
         # key encoder is target network -> projection layer
         self.key_projection_layer = None

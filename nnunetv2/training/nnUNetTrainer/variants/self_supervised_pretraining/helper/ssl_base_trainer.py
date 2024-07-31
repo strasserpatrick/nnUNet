@@ -30,7 +30,6 @@ class nnUNetSSLBaseTrainer(nnUNetTrainer):
                 "Warning: Using SSL pretraining with a single fold. This is not recommended."
             )
 
-        self._set_hyperparameters(**kwargs)
         self.gap = torch.nn.AdaptiveAvgPool3d(1).to(self.device)
 
     def _determine_out_dimensionality(self):

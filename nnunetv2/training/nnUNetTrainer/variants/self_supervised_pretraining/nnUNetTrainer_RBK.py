@@ -19,18 +19,6 @@ from nnunetv2.utilities.label_handling.label_handling import (
 
 
 class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
-    DEFAULT_PARAMS: dict = {
-        "num_val_iterations_per_epoch": 0,
-        "num_epochs": 2000,
-        "batch_size": 8,
-        "feature_dimension": 64,
-        "order_n_class": 100,  # we need as many classes as total permutations to guess from
-        "num_cubes_per_side": 2,
-        "learning_rate": 1e-3,
-        "learning_rate_decay": [250],
-        "weight_decay": 1e-6,
-    }
-
     def __init__(
             self,
             plans: dict,
@@ -44,6 +32,16 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
         super().__init__(
             plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
         )
+
+        self.num_val_iterations_per_epoch = 0
+        self.num_epochs = 2000
+        self.batch_size = 8
+        self.feature_dimension = 64
+        self.order_n_class = 100
+        self.num_cubes_per_side = 2
+        self.learning_rate = 1e-3
+        self.learning_rate_decay = [250]
+        self.weight_decay = 1e-6
 
         self.num_cubes = self.num_cubes_per_side ** 3
 

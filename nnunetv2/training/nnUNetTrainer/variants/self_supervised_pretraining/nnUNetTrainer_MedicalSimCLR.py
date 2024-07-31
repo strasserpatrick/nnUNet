@@ -19,17 +19,6 @@ from nnunetv2.utilities.helpers import dummy_context
 
 
 class nnUNetTrainer_MedicalSimCLR(nnUNetSSLBaseTrainer):
-    DEFAULT_PARAMS: dict = {
-        "temperature": 0.07,
-        "learning_rate": 0.05,
-        "weight_decay": 1e-4,
-        "use_projection_layer": True,
-        "latent_space_dim": 512,
-        "num_val_iterations_per_epoch": 0,
-        "batch_size": 128,
-        "num_epochs": 100,
-    }
-
     def __init__(
             self,
             plans: dict,
@@ -43,6 +32,15 @@ class nnUNetTrainer_MedicalSimCLR(nnUNetSSLBaseTrainer):
         super().__init__(
             plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
         )
+
+        self.temperature = 0.07
+        self.learning_rate = 0.05
+        self.weight_decay = 1e-4
+        self.use_projection_layer = True
+        self.latent_space_dim = 512
+        self.num_val_iterations_per_epoch = 0
+        self.batch_size = 128
+        self.num_epochs = 100
 
         self.projection_layer = None
 

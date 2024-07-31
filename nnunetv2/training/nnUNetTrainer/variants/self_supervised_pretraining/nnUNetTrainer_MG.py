@@ -17,13 +17,6 @@ from nnunetv2.utilities.label_handling.label_handling import determine_num_input
 
 
 class nnUNetTrainer_MG(nnUNetSSLBaseTrainer):
-    DEFAULT_PARAMS: dict = {
-        "num_epochs": 2000,
-        "num_val_iterations_per_epoch": 0,
-        "learning_rate": 1e-3,
-        "sgd_momentum": 0.9,
-    }
-
     def __init__(
             self,
             plans: dict,
@@ -37,6 +30,11 @@ class nnUNetTrainer_MG(nnUNetSSLBaseTrainer):
         super().__init__(
             plans, configuration, fold, dataset_json, unpack_dataset, device, **kwargs
         )
+
+        self.num_val_iterations_per_epoch = 0
+        self.num_epochs = 2000
+        self.learning_rate = 1e-3
+        self.sgd_momentum = 0.9
 
     def initialize(self):
         if not self.was_initialized:
