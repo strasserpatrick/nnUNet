@@ -38,14 +38,14 @@ def get_trainer_from_args(dataset_name_or_id: Union[int, str],
                           device: torch.device = torch.device('cuda')):
     # load nnunet class and do sanity checks
     nnunet_trainer = recursive_find_python_class(join(nnunetv2.__path__[0], "training", "nnUNetTrainer"),
-                                                trainer_name, 'nnunetv2.training.nnUNetTrainer')
+                                                 trainer_name, 'nnunetv2.training.nnUNetTrainer')
     if nnunet_trainer is None:
         raise RuntimeError(f'Could not find requested nnunet trainer {trainer_name} in '
                            f'nnunetv2.training.nnUNetTrainer ('
                            f'{join(nnunetv2.__path__[0], "training", "nnUNetTrainer")}). If it is located somewhere '
                            f'else, please move it there.')
     assert issubclass(nnunet_trainer, nnUNetTrainer), 'The requested nnunet trainer class must inherit from ' \
-                                                    'nnUNetTrainer'
+                                                      'nnUNetTrainer'
 
     # handle dataset input. If it's an ID we need to convert to int from string
     if dataset_name_or_id.startswith('Dataset'):
@@ -69,7 +69,7 @@ def get_trainer_from_args(dataset_name_or_id: Union[int, str],
 
 
 def maybe_load_checkpoint(nnunet_trainer: nnUNetTrainer, continue_training: bool, validation_only: bool,
-                          pretrained_weights_file: str = None):
+                          pretrained_weights_file: str = None, encoder_only: bool = False):
     if continue_training and pretrained_weights_file is not None:
         raise RuntimeError('Cannot both continue a training AND load pretrained weights. Pretrained weights can only '
                            'be used at the beginning of the training.')
@@ -82,7 +82,7 @@ def maybe_load_checkpoint(nnunet_trainer: nnUNetTrainer, continue_training: bool
             expected_checkpoint_file = join(nnunet_trainer.output_folder, 'checkpoint_best.pth')
         if not isfile(expected_checkpoint_file):
             print(f"WARNING: Cannot continue training because there seems to be no checkpoint available to "
-                               f"continue from. Starting a new training...")
+                  f"continue from. Starting a new training...")
             expected_checkpoint_file = None
     elif validation_only:
         expected_checkpoint_file = join(nnunet_trainer.output_folder, 'checkpoint_final.pth')
@@ -92,7 +92,7 @@ def maybe_load_checkpoint(nnunet_trainer: nnUNetTrainer, continue_training: bool
         if pretrained_weights_file is not None:
             if not nnunet_trainer.was_initialized:
                 nnunet_trainer.initialize()
-            load_pretrained_weights(nnunet_trainer.network, pretrained_weights_file, verbose=True)
+            load_pretrained_weights(nnunet_trainer.network, pretrained_weights_file, encoder_only, verbose=True)
         expected_checkpoint_file = None
 
     if expected_checkpoint_file is not None:
@@ -109,7 +109,7 @@ def cleanup_ddp():
 
 
 def run_ddp(rank, dataset_name_or_id, configuration, fold, tr, p, use_compressed, disable_checkpointing, c, val,
-            pretrained_weights, npz, val_with_best, world_size):
+            pretrained_weights, encoder_only, npz, val_with_best, world_size):
     setup_ddp(rank, world_size)
     torch.cuda.set_device(torch.device('cuda', dist.get_rank()))
 
@@ -121,7 +121,7 @@ def run_ddp(rank, dataset_name_or_id, configuration, fold, tr, p, use_compressed
 
     assert not (c and val), f'Cannot set --c and --val flag at the same time. Dummy.'
 
-    maybe_load_checkpoint(nnunet_trainer, c, val, pretrained_weights)
+    maybe_load_checkpoint(nnunet_trainer, c, val, pretrained_weights, encoder_only)
 
     if torch.cuda.is_available():
         cudnn.deterministic = False
@@ -141,6 +141,7 @@ def run_training(dataset_name_or_id: Union[str, int],
                  trainer_class_name: str = 'nnUNetTrainer',
                  plans_identifier: str = 'nnUNetPlans',
                  pretrained_weights: Optional[str] = None,
+                 encoder_only: bool = False,
                  num_gpus: int = 1,
                  use_compressed_data: bool = False,
                  export_validation_probabilities: bool = False,
@@ -160,7 +161,8 @@ def run_training(dataset_name_or_id: Union[str, int],
             try:
                 fold = int(fold)
             except ValueError as e:
-                print(f'Unable to convert given value for fold to int: {fold}. fold must bei either "all" or an integer!')
+                print(
+                    f'Unable to convert given value for fold to int: {fold}. fold must bei either "all" or an integer!')
                 raise e
 
     if val_with_best:
@@ -187,6 +189,7 @@ def run_training(dataset_name_or_id: Union[str, int],
                      continue_training,
                      only_run_validation,
                      pretrained_weights,
+                     encoder_only,
                      export_validation_probabilities,
                      val_with_best,
                      num_gpus),
@@ -199,9 +202,10 @@ def run_training(dataset_name_or_id: Union[str, int],
         if disable_checkpointing:
             nnunet_trainer.disable_checkpointing = disable_checkpointing
 
-        assert not (continue_training and only_run_validation), f'Cannot set --c and --val flag at the same time. Dummy.'
+        assert not (
+                continue_training and only_run_validation), f'Cannot set --c and --val flag at the same time. Dummy.'
 
-        maybe_load_checkpoint(nnunet_trainer, continue_training, only_run_validation, pretrained_weights)
+        maybe_load_checkpoint(nnunet_trainer, continue_training, only_run_validation, pretrained_weights, encoder_only)
 
         if torch.cuda.is_available():
             cudnn.deterministic = False
@@ -231,6 +235,7 @@ def run_training_entry():
     parser.add_argument('-pretrained_weights', type=str, required=False, default=None,
                         help='[OPTIONAL] path to nnU-Net checkpoint file to be used as pretrained model. Will only '
                              'be used when actually training. Beta. Use with caution.')
+    parser.add_argument('--encoder_only', action='store_true', required=False, default=False)
     parser.add_argument('-num_gpus', type=int, default=1, required=False,
                         help='Specify the number of GPUs to use for training')
     parser.add_argument("--use_compressed", default=False, action="store_true", required=False,
@@ -253,12 +258,13 @@ def run_training_entry():
                         help='[OPTIONAL] Set this flag to disable checkpointing. Ideal for testing things out and '
                              'you dont want to flood your hard drive with checkpoints.')
     parser.add_argument('-device', type=str, default='cuda', required=False,
-                    help="Use this to set the device the training should run with. Available options are 'cuda' "
-                         "(GPU), 'cpu' (CPU) and 'mps' (Apple M1/M2). Do NOT use this to set which GPU ID! "
-                         "Use CUDA_VISIBLE_DEVICES=X nnUNetv2_train [...] instead!")
+                        help="Use this to set the device the training should run with. Available options are 'cuda' "
+                             "(GPU), 'cpu' (CPU) and 'mps' (Apple M1/M2). Do NOT use this to set which GPU ID! "
+                             "Use CUDA_VISIBLE_DEVICES=X nnUNetv2_train [...] instead!")
     args = parser.parse_args()
 
-    assert args.device in ['cpu', 'cuda', 'mps'], f'-device must be either cpu, mps or cuda. Other devices are not tested/supported. Got: {args.device}.'
+    assert args.device in ['cpu', 'cuda',
+                           'mps'], f'-device must be either cpu, mps or cuda. Other devices are not tested/supported. Got: {args.device}.'
     if args.device == 'cpu':
         # let's allow torch to use hella threads
         import multiprocessing
@@ -273,7 +279,9 @@ def run_training_entry():
         device = torch.device('mps')
 
     run_training(args.dataset_name_or_id, args.configuration, args.fold, args.tr, args.p, args.pretrained_weights,
-                 args.num_gpus, args.use_compressed, args.npz, args.c, args.val, args.disable_checkpointing, args.val_best,
+                 args.encoder_only,
+                 args.num_gpus, args.use_compressed, args.npz, args.c, args.val, args.disable_checkpointing,
+                 args.val_best,
                  device=device)
 
 
