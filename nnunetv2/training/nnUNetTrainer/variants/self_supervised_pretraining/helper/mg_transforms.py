@@ -20,22 +20,13 @@ class MGTransforms(AbstractTransform):
         self.inpainting_rate = inpainting_rate
 
     def __call__(self, **data_dict):
-        result_dict = {"image": [], "segmentation": []}
-
         data = data_dict["image"]
 
-        if data.ndim == 4:
-            data = data.unsqueeze(0)
-        batch_size = data.shape[0]
-
-        # TODO: rewrite this to use torch tensors
         if isinstance(data, torch.Tensor):
             data = data.cpu().numpy()
 
-        for b in range(batch_size):
-            d, t = self.mg_transform(data[b])
-            result_dict["image"].append(d)
-            result_dict["segmentation"].append(t)
+        d, t = self.mg_transform(data)
+        result_dict = {"image": [d], "segmentation": [t]}
 
         # autocast (torch) only works for float32 not float64
         result_dict["image"] = np.stack(result_dict["image"]).astype(np.float32)
