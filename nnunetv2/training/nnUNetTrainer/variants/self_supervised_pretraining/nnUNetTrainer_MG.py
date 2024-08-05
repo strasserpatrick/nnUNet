@@ -6,7 +6,7 @@ import torch.nn
 from batchgenerators.transforms.abstract_transforms import AbstractTransform
 from torch import autocast
 
-from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.mg_transforms import MGTransform
+from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.mg_transforms import MGTransforms
 from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper.ssl_base_trainer import (
     nnUNetSSLBaseTrainer,
 )
@@ -109,4 +109,4 @@ class nnUNetTrainer_MG(nnUNetSSLBaseTrainer):
             regions: List[Union[List[int], Tuple[int, ...], int]] = None,
             ignore_label: int = None,
     ) -> AbstractTransform:
-        return MGTransform(crop_size=patch_size)
+        return MGTransforms(crop_size=patch_size)

@@ -8,7 +8,7 @@ from nnunetv2.training.nnUNetTrainer.variants.self_supervised_pretraining.helper
     bezier_curve
 
 
-class MGTransform(AbstractTransform):
+class MGTransforms(AbstractTransform):
     def __init__(self, crop_size, flip_rate: float = 0.4, local_pixel_shuffling_rate: float = 0.5,
                  nonlinear_transformation_rate: float = 0.9, paint_rate: float = 0.9, inpainting_rate: float = 0.2):
         self.crop_size = crop_size
@@ -19,21 +19,21 @@ class MGTransform(AbstractTransform):
         self.inpainting_rate = inpainting_rate
 
     def __call__(self, **data_dict):
-        data = data_dict["data"]
+        data = data_dict["image"]
         batch_size = data.shape[0]
 
-        result_dict = {"data": [], "target": []}
+        result_dict = {"image": [], "segmentation": []}
 
         for b in range(batch_size):
             d, t = self.mg_transform(data[b])
-            result_dict["data"].append(d)
-            result_dict["target"].append(t)
+            result_dict["image"].append(d)
+            result_dict["segmentation"].append(t)
 
         # autocast (torch) only works for float32 not float64
-        result_dict["data"] = np.stack(result_dict["data"]).astype(np.float32)
-        result_dict["target"] = np.stack(result_dict["target"]).astype(np.float32)
+        result_dict["image"] = np.stack(result_dict["image"]).astype(np.float32)
+        result_dict["segmentation"] = np.stack(result_dict["segmentation"]).astype(np.float32)
 
-        return NumpyToTensor(keys=["data", "target"])(**result_dict)
+        return NumpyToTensor(keys=["image", "segmentation"])(**result_dict)
 
     def mg_transform(self, data):
         """
