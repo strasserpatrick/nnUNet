@@ -1,6 +1,7 @@
 import copy
 
 import numpy as np
+import torch
 from batchgenerators.transforms.abstract_transforms import AbstractTransform
 from batchgenerators.transforms.utility_transforms import NumpyToTensor
 
@@ -22,10 +23,14 @@ class MGTransforms(AbstractTransform):
         result_dict = {"image": [], "segmentation": []}
 
         data = data_dict["image"]
-        batch_size = data.shape[0]
 
         if data.ndim == 4:
             data = data.unsqueeze(0)
+        batch_size = data.shape[0]
+
+        # TODO: rewrite this to use torch tensors
+        if isinstance(data, torch.Tensor):
+            data = data.cpu().numpy()
 
         for b in range(batch_size):
             d, t = self.mg_transform(data[b])
