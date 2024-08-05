@@ -22,15 +22,12 @@ class MGTransforms(AbstractTransform):
     def __call__(self, **data_dict):
         data = data_dict["image"]
 
+        # TODO: make this compatible with torch.Tensor
         if isinstance(data, torch.Tensor):
             data = data.cpu().numpy()
 
         d, t = self.mg_transform(data)
-        result_dict = {"image": [d], "segmentation": [t]}
-
-        # autocast (torch) only works for float32 not float64
-        result_dict["image"] = np.stack(result_dict["image"]).astype(np.float32)
-        result_dict["segmentation"] = np.stack(result_dict["segmentation"]).astype(np.float32)
+        result_dict = {"image": d.astype(np.float32), "segmentation": t.astype(np.float32)}
 
         return NumpyToTensor(keys=["image", "segmentation"])(**result_dict)
 
