@@ -19,10 +19,13 @@ class MGTransforms(AbstractTransform):
         self.inpainting_rate = inpainting_rate
 
     def __call__(self, **data_dict):
+        result_dict = {"image": [], "segmentation": []}
+
         data = data_dict["image"]
         batch_size = data.shape[0]
 
-        result_dict = {"image": [], "segmentation": []}
+        if data.ndim == 4:
+            data = data.unsqueeze(0)
 
         for b in range(batch_size):
             d, t = self.mg_transform(data[b])

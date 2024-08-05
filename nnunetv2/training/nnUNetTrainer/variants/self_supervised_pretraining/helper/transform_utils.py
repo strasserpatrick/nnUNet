@@ -4,9 +4,6 @@ from scipy.special import comb
 
 
 def crop_data(data, crop_size, center_crop=True):
-    if data.ndim == 4:
-        data = data.unsqueeze(0)
-
     _, data_h, data_w, data_d = data.shape
 
     if center_crop:
