@@ -26,9 +26,6 @@ class MGTransforms(AbstractTransform):
         if isinstance(data, torch.Tensor):
             data = data.cpu().numpy()
 
-        else:
-            print(type(data))
-
         d, t = self.mg_transform(data)
         result_dict = {"image": d.astype(np.float32), "segmentation": t.astype(np.float32)}
 
