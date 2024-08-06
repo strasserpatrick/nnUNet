@@ -162,7 +162,6 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
             if self.device.type == "cuda"
             else dummy_context()
         ):
-            print(data.shape)
             view1, view2 = data[:, 0], data[:, 1]
 
             self._momentum_update_key_encoder()
