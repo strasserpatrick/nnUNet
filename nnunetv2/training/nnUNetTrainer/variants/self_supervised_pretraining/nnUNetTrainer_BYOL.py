@@ -39,8 +39,8 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
         self.num_epochs = 2000
         self.learning_rate = 1e-4
         self.weight_decay = 1e-4
-        self.hidden_dim = 256
-        self.pred_dim = 256
+        self.hidden_dim = 512
+        self.pred_dim = 512
         self.momentum = 0.996
         self.num_val_iterations_per_epoch = 0
         # self.sgd_momentum = 0.9
