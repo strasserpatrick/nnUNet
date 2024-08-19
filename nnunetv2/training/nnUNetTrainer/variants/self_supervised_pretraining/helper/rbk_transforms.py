@@ -23,26 +23,16 @@ class RBKTransform(AbstractTransform):
 
     def __call__(self, **data_dict):
 
-        data = data_dict["data"]
-        batch_size = data.shape[0]
+        data = data_dict["image"]
 
-        result_dict = {"data": [], "order_label": [], "hor_label": [], "ver_label": []}
+        d, o, h, v = self.rbk_transform(data)
+        result_dict = {"image": d, "order_label": o, "hor_label": h, "ver_label": v}
 
-        for b in range(batch_size):
-            d, o, h, v = self.rbk_transform(data[b])
-            result_dict["data"].append(d)
-            result_dict["order_label"].append(o)
-            result_dict["hor_label"].append(h)
-            result_dict["ver_label"].append(v)
+        tensor_dict = NumpyToTensor(keys=["image", "order_label", "hor_label", "ver_label"])(**result_dict)
 
-        # make lists to array -> restore batch dimension
-        for k in ["data", "order_label", "hor_label", "ver_label"]:
-            result_dict[k] = np.stack(result_dict[k], axis=0)
-
-        tensor_dict = NumpyToTensor(keys=["data", "order_label", "hor_label", "ver_label"])(**result_dict)
-        return {"data": tensor_dict["data"],
-                "target": {"order_label": tensor_dict["order_label"], "hor_label": tensor_dict["hor_label"],
-                           "ver_label": tensor_dict["ver_label"]}}
+        return {"image": tensor_dict["image"],
+                "segmentation": {"order_label": tensor_dict["order_label"], "hor_label": tensor_dict["hor_label"],
+                                 "ver_label": tensor_dict["ver_label"]}}
 
     def rbk_transform(self, data):
         """
@@ -63,10 +53,10 @@ class RBKTransform(AbstractTransform):
         rearranged_rotated_cubes, hor_label, ver_label = self._rotate_cubes(rearranged_cubes)
 
         return (
-            rearranged_rotated_cubes,
-            order_label,
-            hor_label,
-            ver_label,
+            np.array(rearranged_rotated_cubes),
+            np.array([order_label]),
+            np.array(hor_label),
+            np.array(ver_label),
         )
 
     def _extract_3d_cubes(self, data):
