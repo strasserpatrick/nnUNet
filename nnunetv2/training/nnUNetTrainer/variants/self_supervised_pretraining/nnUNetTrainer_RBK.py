@@ -33,7 +33,7 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
         )
 
         self.num_val_iterations_per_epoch = 0
-        self.num_epochs = 2
+        self.num_epochs = 1000
         self.batch_size = 8
         self.feature_dimension = 64
         self.order_n_class = 100
