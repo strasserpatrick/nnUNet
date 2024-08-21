@@ -142,7 +142,7 @@ class nnUNetTrainer_RBK(nnUNetSSLBaseTrainer):
         order_loss_fn, rotate_loss_fn = self.loss
 
         # https://stackoverflow.com/questions/71399847/runtimeerror-0d-or-1d-target-tensor-expected-multi-target-not-supported-i-was
-        order_label_target = torch.unsqueeze(target["order_label"], 1)
+        order_label_target = torch.squeeze(target["order_label"], 1)
         order_loss = order_loss_fn(order_logits, order_label_target)
 
         hor_rot_loss = rotate_loss_fn(
