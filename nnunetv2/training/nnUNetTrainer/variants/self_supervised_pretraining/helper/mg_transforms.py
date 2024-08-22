@@ -42,7 +42,7 @@ class MGTransforms(AbstractTransform):
         gt = copy.deepcopy(input_patch)
 
         # Flipping
-        flipped_input_patch, flipped_gt = self._data_augmentation(input_patch, gt)
+        flipped_input_patch, flipped_gt = self._flip_image(input_patch, gt)
 
         # Local Shuffling Pixel
         shuffled_input_patch = self._local_pixel_shuffling(flipped_input_patch)
@@ -61,7 +61,7 @@ class MGTransforms(AbstractTransform):
 
         return painted_input_patch, flipped_gt
 
-    def _data_augmentation(self, ipt, gt):
+    def _flip_image(self, ipt, gt):
         count = 3
         while np.random.uniform() < self.flip_rate and count > 0:
             axis = np.random.randint(0, 3)
