@@ -38,7 +38,7 @@ class MGTransforms(AbstractTransform):
         :return dictionary containing the transformed data
         This includes random cropping, pixel shuffling, nonlinear transformation and inpainting/outpainting.
         """
-        input_patch = crop_data(data, crop_size=self.crop_size)
+        input_patch = crop_data(data, crop_size=self.crop_size, center_crop=False)
         gt = copy.deepcopy(input_patch)
 
         # Flipping
@@ -55,6 +55,9 @@ class MGTransforms(AbstractTransform):
             painted_input_patch = self._inpainting(transformed_input_patch)
         else:
             painted_input_patch = self._outpainting(transformed_input_patch)
+
+        from batchviewer import view_batch
+        view_batch(painted_input_patch, width=300, height=300)
 
         return painted_input_patch, flipped_gt
 
