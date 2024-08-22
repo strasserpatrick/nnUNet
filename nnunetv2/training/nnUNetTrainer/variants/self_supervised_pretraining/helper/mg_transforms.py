@@ -75,9 +75,9 @@ class MGTransforms(AbstractTransform):
         if np.random.uniform() >= self.local_pixel_shuffling_rate:
             return ipt
 
-        image_temp = copy.deepcopy(ipt)
+        local_shuffling_x = copy.deepcopy(ipt)
         orig_image = copy.deepcopy(ipt)
-        _, img_rows, img_cols, img_deps = ipt.shape
+        modalities, img_rows, img_cols, img_deps = ipt.shape
         num_block = 10000
         for _ in range(num_block):
             block_noise_size_x = np.random.randint(1, img_rows // 10)
@@ -86,19 +86,18 @@ class MGTransforms(AbstractTransform):
             noise_x = np.random.randint(0, img_rows - block_noise_size_x)
             noise_y = np.random.randint(0, img_cols - block_noise_size_y)
             noise_z = np.random.randint(0, img_deps - block_noise_size_z)
-            window = orig_image[0, noise_x:noise_x + block_noise_size_x,
+            window = orig_image[:, noise_x:noise_x + block_noise_size_x,
                      noise_y:noise_y + block_noise_size_y,
                      noise_z:noise_z + block_noise_size_z,
                      ]
             window = window.flatten()
             np.random.shuffle(window)
-            window = window.reshape((block_noise_size_x,
+            window = window.reshape((modalities, block_noise_size_x,
                                      block_noise_size_y,
                                      block_noise_size_z))
-            image_temp[0, noise_x:noise_x + block_noise_size_x,
+            local_shuffling_x[:, noise_x:noise_x + block_noise_size_x,
             noise_y:noise_y + block_noise_size_y,
             noise_z:noise_z + block_noise_size_z] = window
-        local_shuffling_x = image_temp
 
         return local_shuffling_x
 
