@@ -56,9 +56,6 @@ class MGTransforms(AbstractTransform):
         else:
             painted_input_patch = self._outpainting(transformed_input_patch)
 
-        from batchviewer import view_batch
-        view_batch(painted_input_patch, width=300, height=300)
-
         return painted_input_patch, flipped_gt
 
     def _flip_image(self, ipt, gt):
