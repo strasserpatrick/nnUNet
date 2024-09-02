@@ -114,7 +114,7 @@ class MGTransforms(AbstractTransform):
 
     @staticmethod
     def _inpainting(x):
-        _, img_rows, img_cols, img_deps = x.shape
+        modalities, img_rows, img_cols, img_deps = x.shape
         cnt = 5
         while cnt > 0 and np.random.uniform() < 0.95:
             block_noise_size_x = np.random.randint(img_rows // 6, img_rows // 3)
@@ -126,7 +126,7 @@ class MGTransforms(AbstractTransform):
             x[:,
             noise_x:noise_x + block_noise_size_x,
             noise_y:noise_y + block_noise_size_y,
-            noise_z:noise_z + block_noise_size_z] = np.random.rand(block_noise_size_x,
+            noise_z:noise_z + block_noise_size_z] = np.random.rand(modalities, block_noise_size_x,
                                                                    block_noise_size_y,
                                                                    block_noise_size_z, ) * 1.0
             cnt -= 1
