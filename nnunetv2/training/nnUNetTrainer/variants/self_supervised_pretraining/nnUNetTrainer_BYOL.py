@@ -36,7 +36,7 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
             plans, configuration, fold, dataset_json, unpack_dataset, device
         )
 
-        self.num_epochs = 2000
+        self.num_epochs = 1000
         self.learning_rate = 1e-4
         self.weight_decay = 1e-4
         self.hidden_dim = 512

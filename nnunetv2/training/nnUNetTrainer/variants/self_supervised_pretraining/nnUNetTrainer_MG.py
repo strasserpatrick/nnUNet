@@ -31,7 +31,7 @@ class nnUNetTrainer_MG(nnUNetSSLBaseTrainer):
         )
 
         self.num_val_iterations_per_epoch = 0
-        self.num_epochs = 2000
+        self.num_epochs = 1000
         self.learning_rate = 1e-3
         self.sgd_momentum = 0.9
 
