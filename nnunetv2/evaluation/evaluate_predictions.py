@@ -139,7 +139,7 @@ def compute_metrics_for_region_label(
         results[key_name][r]["n_pred"] = fp + tp
         results[key_name][r]["n_ref"] = fn + tp
 
-        return results
+    return results
 
 
 def compute_metrics(
@@ -186,6 +186,7 @@ def compute_metrics(
             key_name="label_metrics",
         )
 
+    return results
 
 def compute_metrics_on_folder(
     folder_ref: str,
@@ -238,6 +239,15 @@ def compute_metrics_on_folder(
         for m in metric_list:
             means[r][m] = np.nanmean([i["metrics"][r][m] for i in results])
 
+    # mean also labels
+    label_means = {}
+    if "label_metrics" in results[0]:
+        labels = results[0]['label_metrics'].keys()
+        for label in labels:
+            label_means[label] = {}
+            for m in metric_list:
+                label_means[label][m] = np.nanmean([i["label_metrics"][label][m] for i in results])
+
     # foreground mean
     foreground_mean = {}
     for m in metric_list:
@@ -254,6 +264,7 @@ def compute_metrics_on_folder(
     result = {
         "metric_per_case": results,
         "mean": means,
+        "label_means": label_means,
         "foreground_mean": foreground_mean,
     }
     if output_file is not None:
