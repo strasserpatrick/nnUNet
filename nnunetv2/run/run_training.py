@@ -218,6 +218,7 @@ def run_training(
     val_with_best: bool = False,
     device: torch.device = torch.device("cuda"),
     advanced_metrics: bool = False,
+    region_and_label: bool = False,
 ):
     if plans_identifier == "nnUNetPlans":
         print(
@@ -312,7 +313,7 @@ def run_training(
                 join(nnunet_trainer.output_folder, "checkpoint_best.pth")
             )
         nnunet_trainer.perform_actual_validation(
-            export_validation_probabilities, advanced_metrics
+            export_validation_probabilities, advanced_metrics, region_and_label
         )
 
 
@@ -408,6 +409,13 @@ def run_training_entry():
         help="[OPTIONAL] If set, advanced (compute intensive metrics such as HD95 are computed as well",
     )
     parser.add_argument(
+        "--region_and_label_metrics",
+        action="store_true",
+        default=False,
+        required=False,
+        help="[OPTIONAL] If set, metrics are computed for both label and regions (if trained on regions beforehand)" 
+    )
+    parser.add_argument(
         "--disable_checkpointing",
         action="store_true",
         required=False,
@@ -461,6 +469,7 @@ def run_training_entry():
         args.val_best,
         device=device,
         advanced_metrics=args.advanced_metrics,
+        region_and_label=args.region_and_label_metrics
     )
 
 

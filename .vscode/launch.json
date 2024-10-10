@@ -89,6 +89,8 @@
                 "-pretrained_weights",
                 "${userHome}/results_backup_new/043/baseline/fold_0/run_1/checkpoint_best.pth",
                 "--val",
+                "--advanced_metrics",
+                "--region_and_label_metrics"
             ],
             "envFile": "${workspaceFolder}/.env",
             "env": {

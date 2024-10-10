@@ -1233,7 +1233,7 @@ class nnUNetTrainer(object):
             if checkpoint['grad_scaler_state'] is not None:
                 self.grad_scaler.load_state_dict(checkpoint['grad_scaler_state'])
 
-    def perform_actual_validation(self, save_probabilities: bool = False, advanced_metrices=False):
+    def perform_actual_validation(self, save_probabilities: bool = False, advanced_metrics=False, region_and_label=False):
         self.set_deep_supervision_enabled(False)
         self.network.eval()
 
@@ -1369,7 +1369,8 @@ class nnUNetTrainer(object):
                                                 self.label_manager.foreground_labels,
                                                 self.label_manager.ignore_label, chill=True,
                                                 num_processes=default_num_processes * dist.get_world_size() if
-                                                self.is_ddp else default_num_processes, advanced_metrices=advanced_metrices)
+                                                self.is_ddp else default_num_processes, advanced_metrics=advanced_metrics, 
+                                                region_and_label=region_and_label)
             self.print_to_log_file("Validation complete", also_print_to_console=True)
             self.print_to_log_file("Mean Validation Dice: ", (metrics['foreground_mean']["Dice"]),
                                    also_print_to_console=True)
