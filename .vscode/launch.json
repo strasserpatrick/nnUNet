@@ -74,8 +74,27 @@
                 "-tr",
                 "nnUNetTrainer_MG",
                 "-p",
-                "nnUNetPlans43MG"
+                "nnUNetPlansPretraining"
             ]
+        },
+        {
+            "name": "HD Validation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/nnunetv2/run/run_training.py",
+            "args": [
+                "043",
+                "3d_fullres",
+                "0",
+                "-pretrained_weights",
+                "${userHome}/results_backup_new/043/baseline/fold_0/run_1/checkpoint_best.pth",
+                "--val",
+            ],
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "console": "internalConsole"       
         }
     ]
 }
