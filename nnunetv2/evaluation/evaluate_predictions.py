@@ -1,12 +1,13 @@
 import multiprocessing
 import os
 from copy import deepcopy
-from multiprocessing import Pool
-from typing import Tuple, List, Union, Optional
+from typing import Tuple, List, Union
 
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import subfiles, join, save_json, load_json, \
     isfile
+import seg_metrics.seg_metrics as sg
+
 from nnunetv2.configuration import default_num_processes
 from nnunetv2.imageio.base_reader_writer import BaseReaderWriter
 from nnunetv2.imageio.reader_writer_registry import determine_reader_writer_from_dataset_json, \
@@ -88,7 +89,7 @@ def compute_tp_fp_fn_tn(mask_ref: np.ndarray, mask_pred: np.ndarray, ignore_mask
 
 def compute_metrics(reference_file: str, prediction_file: str, image_reader_writer: BaseReaderWriter,
                     labels_or_regions: Union[List[int], List[Union[int, Tuple[int, ...]]]],
-                    ignore_label: int = None) -> dict:
+                    ignore_label: int = None, advanced_metrics: bool = False) -> dict:
     # load images
     seg_ref, seg_ref_dict = image_reader_writer.read_seg(reference_file)
     seg_pred, seg_pred_dict = image_reader_writer.read_seg(prediction_file)
@@ -110,6 +111,11 @@ def compute_metrics(reference_file: str, prediction_file: str, image_reader_writ
         else:
             results['metrics'][r]['Dice'] = 2 * tp / (2 * tp + fp + fn)
             results['metrics'][r]['IoU'] = tp / (tp + fp + fn)
+
+        if advanced_metrics:
+            print("Hello")
+            hd95 = sg.write_metrics(...)
+
         results['metrics'][r]['FP'] = fp
         results['metrics'][r]['TP'] = tp
         results['metrics'][r]['FN'] = fn
@@ -125,7 +131,8 @@ def compute_metrics_on_folder(folder_ref: str, folder_pred: str, output_file: st
                               regions_or_labels: Union[List[int], List[Union[int, Tuple[int, ...]]]],
                               ignore_label: int = None,
                               num_processes: int = default_num_processes,
-                              chill: bool = True) -> dict:
+                              chill: bool = True,
+                              advanced_metrics: bool = False) -> dict:
     """
     output_file must end with .json; can be None
     """
@@ -143,8 +150,9 @@ def compute_metrics_on_folder(folder_ref: str, folder_pred: str, output_file: st
         #     compute_metrics(*i)
         results = pool.starmap(
             compute_metrics,
-            list(zip(files_ref, files_pred, [image_reader_writer] * len(files_pred), [regions_or_labels] * len(files_pred),
-                     [ignore_label] * len(files_pred)))
+            list(zip(files_ref, files_pred, [image_reader_writer] * len(files_pred),
+                     [regions_or_labels] * len(files_pred),
+                     [ignore_label] * len(files_pred), [advanced_metrics] * len(files_pred)))
         )
 
     # mean metric per class
@@ -178,7 +186,8 @@ def compute_metrics_on_folder(folder_ref: str, folder_pred: str, output_file: st
 def compute_metrics_on_folder2(folder_ref: str, folder_pred: str, dataset_json_file: str, plans_file: str,
                                output_file: str = None,
                                num_processes: int = default_num_processes,
-                               chill: bool = False):
+                               chill: bool = False,
+                               advanced_metrics: bool = False):
     dataset_json = load_json(dataset_json_file)
     # get file ending
     file_ending = dataset_json['file_ending']
@@ -194,14 +203,15 @@ def compute_metrics_on_folder2(folder_ref: str, folder_pred: str, dataset_json_f
     lm = PlansManager(plans_file).get_label_manager(dataset_json)
     compute_metrics_on_folder(folder_ref, folder_pred, output_file, rw, file_ending,
                               lm.foreground_regions if lm.has_regions else lm.foreground_labels, lm.ignore_label,
-                              num_processes, chill=chill)
+                              num_processes, chill=chill, advanced_metrics=advanced_metrics)
 
 
 def compute_metrics_on_folder_simple(folder_ref: str, folder_pred: str, labels: Union[Tuple[int, ...], List[int]],
                                      output_file: str = None,
                                      num_processes: int = default_num_processes,
                                      ignore_label: int = None,
-                                     chill: bool = False):
+                                     chill: bool = False,
+                                     advanced_metrics: bool = False):
     example_file = subfiles(folder_ref, join=True)[0]
     file_ending = os.path.splitext(example_file)[-1]
     rw = determine_reader_writer_from_file_ending(file_ending, example_file, allow_nonmatching_filename=True,
@@ -210,7 +220,8 @@ def compute_metrics_on_folder_simple(folder_ref: str, folder_pred: str, labels: 
     if output_file is None:
         output_file = join(folder_pred, 'summary.json')
     compute_metrics_on_folder(folder_ref, folder_pred, output_file, rw, file_ending,
-                              labels, ignore_label=ignore_label, num_processes=num_processes, chill=chill)
+                              labels, ignore_label=ignore_label, num_processes=num_processes, chill=chill,
+                              advanced_metrics=advanced_metrics)
 
 
 def evaluate_folder_entry_point():
@@ -226,9 +237,13 @@ def evaluate_folder_entry_point():
                         help='Output file. Optional. Default: pred_folder/summary.json')
     parser.add_argument('-np', type=int, required=False, default=default_num_processes,
                         help=f'number of processes used. Optional. Default: {default_num_processes}')
-    parser.add_argument('--chill', action='store_true', help='dont crash if folder_pred does not have all files that are present in folder_gt')
+    parser.add_argument('--chill', action='store_true',
+                        help='dont crash if folder_pred does not have all files that are present in folder_gt')
+    parser.add_argument('--advanced-metrics', action='store_true',
+                        help='compute advanced metrics (e.g. Hausdorff distance)')
     args = parser.parse_args()
-    compute_metrics_on_folder2(args.gt_folder, args.pred_folder, args.djfile, args.pfile, args.o, args.np, chill=args.chill)
+    compute_metrics_on_folder2(args.gt_folder, args.pred_folder, args.djfile, args.pfile, args.o, args.np,
+                               chill=args.chill, advanced_metrics=args.advanced_metrics)
 
 
 def evaluate_simple_entry_point():
@@ -244,10 +259,14 @@ def evaluate_simple_entry_point():
                         help='Output file. Optional. Default: pred_folder/summary.json')
     parser.add_argument('-np', type=int, required=False, default=default_num_processes,
                         help=f'number of processes used. Optional. Default: {default_num_processes}')
-    parser.add_argument('--chill', action='store_true', help='dont crash if folder_pred does not have all files that are present in folder_gt')
+    parser.add_argument('--chill', action='store_true',
+                        help='dont crash if folder_pred does not have all files that are present in folder_gt')
+    parser.add_argument('--advanced-metrics', action='store_true',
+                        help='compute advanced metrics (e.g. Hausdorff distance)')
 
     args = parser.parse_args()
-    compute_metrics_on_folder_simple(args.gt_folder, args.pred_folder, args.l, args.o, args.np, args.il, chill=args.chill)
+    compute_metrics_on_folder_simple(args.gt_folder, args.pred_folder, args.l, args.o, args.np, args.il,
+                                     chill=args.chill, advanced_metrics=args.advanced_metrics)
 
 
 if __name__ == '__main__':
@@ -259,5 +278,6 @@ if __name__ == '__main__':
     regions = labels_to_list_of_regions([1, 2])
     ignore_label = None
     num_processes = 12
-    compute_metrics_on_folder(folder_ref, folder_pred, output_file, image_reader_writer, file_ending, regions, ignore_label,
+    compute_metrics_on_folder(folder_ref, folder_pred, output_file, image_reader_writer, file_ending, regions,
+                              ignore_label,
                               num_processes)
