@@ -109,7 +109,7 @@ def compute_metrics_for_region_label(
     results: dict, regions_or_labels, seg_ref, seg_pred, ignore_mask, advanced_metrics, key_name
 ):
     for r in regions_or_labels:
-        results[r] = {}
+        results[key_name][r] = {}
 
         mask_ref = region_or_label_to_mask(seg_ref, r)
         mask_pred = region_or_label_to_mask(seg_pred, r)
@@ -160,8 +160,8 @@ def compute_metrics(
     results = {}
     results["reference_file"] = reference_file
     results["prediction_file"] = prediction_file
-    results["metrics"] = {}
     
+    results["metrics"] = {}
     compute_metrics_for_region_label(
         results=results,
         regions_or_labels=labels_or_regions,
@@ -172,8 +172,9 @@ def compute_metrics(
         key_name="metrics"
     )
 
-    if type(label_or_region_to_key[0], (list, tuple)) and region_and_label:
+    if isinstance(labels_or_regions[0], (list, tuple)) and region_and_label:
         labels = set([l for r in labels_or_regions for l in r])
+        results["label_metrics"] = {}
         
         compute_metrics_for_region_label(
             results=results,
