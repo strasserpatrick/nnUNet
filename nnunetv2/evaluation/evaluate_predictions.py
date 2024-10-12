@@ -173,7 +173,15 @@ def compute_metrics(
     )
 
     if isinstance(labels_or_regions[0], (list, tuple)) and region_and_label:
-        labels = set([l for r in labels_or_regions for l in r])
+
+        labels = set()
+        for r in labels_or_regions:
+            if isinstance(r, (list, tuple)):
+                for l in r:
+                    labels.add(l)
+            elif isinstance(r, int):
+                labels.add(r)
+
         results["label_metrics"] = {}
         
         compute_metrics_for_region_label(
