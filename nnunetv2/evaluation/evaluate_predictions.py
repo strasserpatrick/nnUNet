@@ -106,7 +106,7 @@ def compute_tp_fp_fn_tn(
 
 
 def compute_metrics_for_region_label(
-    results: dict, regions_or_labels, seg_ref, seg_pred, ignore_mask, advanced_metrics, key_name
+    results: dict, regions_or_labels, seg_ref, seg_pred, ignore_mask, advanced_metrics, key_name, spacing
 ):
     for r in regions_or_labels:
         results[key_name][r] = {}
@@ -128,6 +128,7 @@ def compute_metrics_for_region_label(
                 gdth_img=mask_ref.squeeze(),
                 pred_img=mask_pred.squeeze(),
                 metrics=["hd95"],
+                spacing=spacing,
             )[0]["hd95"][0]
 
             results[key_name][r]["HD95"] = hd95
@@ -150,6 +151,7 @@ def compute_metrics(
     ignore_label: int = None,
     advanced_metrics: bool = False,
     region_and_label: bool = False,
+    spacing=None
 ) -> dict:
     # load images
     seg_ref, seg_ref_dict = image_reader_writer.read_seg(reference_file)
@@ -169,7 +171,8 @@ def compute_metrics(
         seg_pred=seg_pred,
         ignore_mask=ignore_mask,
         advanced_metrics=advanced_metrics,
-        key_name="metrics"
+        key_name="metrics",
+        spacing=spacing
     )
 
     if isinstance(labels_or_regions[0], (list, tuple)) and region_and_label:
@@ -184,6 +187,7 @@ def compute_metrics(
             ignore_mask=ignore_mask,
             advanced_metrics=advanced_metrics,
             key_name="label_metrics",
+            spacing=spacing
         )
 
     return results
@@ -199,7 +203,8 @@ def compute_metrics_on_folder(
     num_processes: int = default_num_processes,
     chill: bool = True,
     advanced_metrics: bool = False,
-    region_and_label: bool = False
+    region_and_label: bool = False,
+    spacing=None
 ) -> dict:
     """
     output_file must end with .json; can be None
@@ -226,7 +231,8 @@ def compute_metrics_on_folder(
                     [regions_or_labels] * len(files_pred),
                     [ignore_label] * len(files_pred),
                     [advanced_metrics] * len(files_pred),
-                    [region_and_label] * len(files_pred)
+                    [region_and_label] * len(files_pred),
+                    [spacing] * len(files_pred),
                 )
             ),
         )
@@ -307,6 +313,7 @@ def compute_metrics_on_folder2(
         num_processes,
         chill=chill,
         advanced_metrics=advanced_metrics,
+        spacing=PlansManager(plans_file).spacing
     )
 
 
