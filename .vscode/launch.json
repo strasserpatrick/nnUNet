@@ -83,11 +83,11 @@
             "request": "launch",
             "program": "${workspaceFolder}/nnunetv2/run/run_training.py",
             "args": [
-                "043",
+                "521",
                 "3d_fullres",
                 "0",
                 "-pretrained_weights",
-                "${userHome}/results_backup_new/043/baseline/fold_0/run_1/checkpoint_best.pth",
+                "${userHome}/results_backup_preeval/521/baseline/fold_0/run_1/checkpoint_best.pth",
                 "--val",
                 "--advanced_metrics",
                 "--region_and_label_metrics"
