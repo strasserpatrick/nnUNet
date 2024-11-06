@@ -3,6 +3,7 @@ from typing import List, Tuple, Union
 import numpy as np
 import torch
 import torch.nn
+import torch.nn.functional as F
 from batchgenerators.transforms.abstract_transforms import AbstractTransform
 from torch import autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -131,7 +132,14 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
             )
 
     def _build_loss(self):
-        return torch.nn.CosineSimilarity(dim=1)
+
+        def cosine_loss(x, y):
+            x = F.normalize(x, dim=-1, p=2)
+            y = F.normalize(y, dim=-1, p=2)
+            return 2 - 2 * (x * y).sum(dim=-1)
+
+        return cosine_loss
+
 
     def configure_optimizers(self):
         all_params = list(self.network.parameters()) + list(self.query_projection_layer.parameters()) + list(
@@ -182,7 +190,7 @@ class nnUNetTrainer_BYOL(nnUNetSSLBaseTrainer):
                 f1 = torch.flatten(self.gap(self.target_network(view1)), 1, -1)
                 z1 = self.key_projection_layer(f1)
 
-            loss = -2 * (self.loss(p1, z2).mean() + self.loss(p2, z1).mean())
+            loss = self.loss(p1, z2).mean() + self.loss(p2, z1).mean()
         return f2, loss
 
     def _initialize_projection_layers(self, in_dimension):

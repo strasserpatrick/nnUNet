@@ -56,7 +56,7 @@
                 "-tr",
                 "nnUNetTrainer_BYOL",
                 "-p",
-                "nnUNetPlans_simclr",
+                "nnUNetPlansEnc",
             ]
         },
         {
